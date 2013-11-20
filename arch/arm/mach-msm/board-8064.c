@@ -1909,9 +1909,15 @@ oppo_tp_power_return:
  }
 #endif
 
+#define GPIO_TOUCH_RST  7
 #define GPIO_TOUCH_INT	6
 #define GPIO_TP_WAKEUP  (14)
 #define GPIO_TP_ID      (15)
+
+int remote_rmi4_get_irq_gpio(void)   //add by yben
+{
+	return (int)GPIO_TOUCH_INT ;
+}
 
 static void touch_init_hw(void)
 {
@@ -1924,6 +1930,12 @@ static void touch_init_hw(void)
 				GPIO_CFG_PULL_UP, GPIO_CFG_2MA), GPIO_CFG_ENABLE);
 		gpio_tlmm_config(GPIO_CFG(GPIO_TP_ID, 0, GPIO_CFG_INPUT,
 				GPIO_CFG_PULL_UP, GPIO_CFG_2MA), GPIO_CFG_ENABLE);
+/* OPPO 2013-08-23 ranfei Add begin for reason */
+        gpio_tlmm_config(GPIO_CFG(GPIO_TOUCH_RST, 0, GPIO_CFG_OUTPUT,
+				GPIO_CFG_PULL_UP, GPIO_CFG_2MA), GPIO_CFG_ENABLE);
+        gpio_request(GPIO_TOUCH_RST, "TOUCH_RST");
+	    gpio_direction_output(GPIO_TOUCH_RST, 1);
+/* OPPO 2013-08-23 ranfei Add end */
 
 		oppo_touchscreen_power(1);
 	}
@@ -3742,6 +3754,10 @@ static void SN3193_power_init(void)
 
 //OPPO 2012-10-23 huyu add for lcd compatible
 static struct i2c_board_info lcd_1080p_info[] = {
+
+	{
+		I2C_BOARD_INFO("lm3630", 0x38),
+	},
 
 	{
 		I2C_BOARD_INFO("lm3528", 0x36),
