@@ -491,6 +491,11 @@ apq8064_pm8921_chg_pdata __devinitdata = {
 #endif
 /* OPPO 2012-11-07 chendx Modify end */
 
+/* OPPO 2013-08-07 zhenwx Add begin for sometimes power key or insert USB no response */
+	.enable_tcxo_warmup_delay = true,
+/* OPPO 2013-08-07 zhenwx Add end */
+
+
 };
 
 static struct pm8xxx_ccadc_platform_data

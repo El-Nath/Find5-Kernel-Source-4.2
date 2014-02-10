@@ -4997,6 +4997,10 @@ static int pm8921_battery_temp_handle(struct pm8921_chg_chip *chip)
 	if(rc < 0)
 		return rc;
 	
+/* OPPO 2013-11-13 wangjc Add begin for solve the problem it can't warn in cold temp */
+	temp /= 10;
+/* OPPO 2013-11-13 wangjc Add end */
+	
 	if(temperature > temp) {
 		temperature = temp;
 	}
@@ -5014,7 +5018,7 @@ static int pm8921_battery_temp_handle(struct pm8921_chg_chip *chip)
 	print_pm8921(DEBUG_TRACE, "%s: temperature =%d, region =%d\n", 
 	 		__func__, temperature, Pm8921_battery_temp_region_get(chip));
 	
-    if(temperature < chip->mBatteryTempBoundT0 &&
+    if(temperature <= chip->mBatteryTempBoundT0 &&
 		 temperature > AUTO_CHARGING_BATT_REMOVE_TEMP) /* battery is cold */
     {
             rc = handle_batt_temp_cold(chip);

@@ -50,12 +50,26 @@
 #define	TEMP_THRESH_STEP		5000	/* Threshold step: 5 C */
 
 /* Register TEMP_ALARM_PWM bits */
+/* OPPO 2013-09-26 zhenwx Modify begin for Configure temperature alarm for always-on operation */
+#ifndef CONFIG_VENDOR_EDIT
 #define	TEMP_ALARM_PWM_EN_MASK		0xC0
 #define	TEMP_ALARM_PWM_EN_SHIFT		6
 #define	TEMP_ALARM_PWM_PER_PRE_MASK	0x38
 #define	TEMP_ALARM_PWM_PER_PRE_SHIFT	3
 #define	TEMP_ALARM_PWM_PER_DIV_MASK	0x07
 #define	TEMP_ALARM_PWM_PER_DIV_SHIFT	0
+#else
+#define TEMP_ALARM_PWM_EN_MASK		0xC0
+#define TEMP_ALARM_PWM_EN_NEVER		0x00
+#define TEMP_ALARM_PWM_EN_SLEEP_B	0x40
+#define TEMP_ALARM_PWM_EN_PWM		0x80
+#define TEMP_ALARM_PWM_EN_ALWAYS	0xC0
+#define TEMP_ALARM_PWM_PER_PRE_MASK	0x38
+#define TEMP_ALARM_PWM_PER_PRE_SHIFT	3
+#define TEMP_ALARM_PWM_PER_DIV_MASK	0x07
+#define TEMP_ALARM_PWM_PER_DIV_SHIFT	0	
+#endif
+/* OPPO 2013-09-26 zhenwx Modify end */
 
 /* Trips: from critical to less critical */
 #define TRIP_STAGE3			0
@@ -514,6 +528,8 @@ static int pm8xxx_tm_init_reg(struct pm8xxx_tm_chip *chip)
 	rc = pm8xxx_tm_write_ctrl(chip, reg);
 	if (rc < 0)
 		return rc;
+/* OPPO 2013-09-26 zhenwx Add begin for  Set the PMIC temperature alarm module to be always on */
+#ifndef CONFIG_VENDOR_EDIT
 
 	/*
 	 * Set the PMIC alarm module PWM to have a frequency of 8 Hz. This
@@ -526,6 +542,19 @@ static int pm8xxx_tm_init_reg(struct pm8xxx_tm_chip *chip)
 		| (3 << TEMP_ALARM_PWM_PER_DIV_SHIFT);
 
 	rc = pm8xxx_tm_write_pwm(chip, reg);
+#else
+	/*
+	* Set the PMIC temperature alarm module to be always on.  This ensures
+	* that die temperature monitoring is active even if CXO is disabled
+	* (i.e. when sleep_b is low).  This is necessary since CXO can be
+	* disabled while the system is still heavily loaded.  Also, using
+	* the alway-on instead of PWM-enabled configurations ensures that the
+	* die temperature can be measured by the PMIC ADC without reconfiguring
+	* the temperature alarm module first. 	 
+	*/
+	rc = pm8xxx_tm_write_pwm(chip, TEMP_ALARM_PWM_EN_ALWAYS);
+#endif
+/* OPPO 2013-09-26 zhenwx Add end */
 
 	return rc;
 }
@@ -680,6 +709,17 @@ static int __devexit pm8xxx_tm_remove(struct platform_device *pdev)
 	return 0;
 }
 
+
+/* OPPO 2013-09-26 zhenwx Add begin for Turn off the temperature alarm during  shutdown */
+#ifdef CONFIG_VENDOR_EDIT
+static void pm8xxx_tm_shutdown(struct platform_device *pdev)
+{
+struct pm8xxx_tm_chip *chip = platform_get_drvdata(pdev);
+pm8xxx_tm_write_pwm(chip, TEMP_ALARM_PWM_EN_NEVER);
+}
+#endif
+/* OPPO 2013-09-26 zhenwx Add end */
+
 #ifdef CONFIG_PM
 static int pm8xxx_tm_suspend(struct device *dev)
 {
@@ -717,6 +757,13 @@ static const struct dev_pm_ops pm8xxx_tm_pm_ops = {
 static struct platform_driver pm8xxx_tm_driver = {
 	.probe	= pm8xxx_tm_probe,
 	.remove	= __devexit_p(pm8xxx_tm_remove),
+
+/* OPPO 2013-09-26 zhenwx Add begin for Turn off the temperature alarm during  shutdown */
+#ifdef CONFIG_VENDOR_EDIT
+	.shutdown = pm8xxx_tm_shutdown,	
+#endif
+/* OPPO 2013-09-26 zhenwx Add end */
+
 	.driver	= {
 		.name = PM8XXX_TM_DEV_NAME,
 		.owner = THIS_MODULE,

@@ -2,6 +2,13 @@ ifeq ($(CONFIG_FB_MSM_MDSS),y)
 obj-y += mdss/
 else
 obj-y := msm_fb.o
+ifeq ($(INIT_DEVICE_X909), true)
+obj-y := msm_fb.o
+endif
+
+ifeq ($(INIT_DEVICE_X909T), true)
+obj-y := msm_fb_909t.o
+endif
 
 obj-$(CONFIG_FB_MSM_LOGO) += logo.o
 obj-$(CONFIG_FB_BACKLIGHT) += msm_fb_bl.o
@@ -77,7 +84,15 @@ obj-$(CONFIG_FB_MSM_MIPI_DSI) += msm_mipi.o
 # MIPI manufacture
 obj-$(CONFIG_FB_MSM_MIPI_DSI_TOSHIBA) += mipi_toshiba.o
 obj-$(CONFIG_FB_MSM_MIPI_DSI_NOVATEK) += mipi_novatek.o
+ifeq ($(INIT_DEVICE_X909), true)
 obj-$(CONFIG_FB_MSM_MIPI_DSI_ORISE) += mipi_orise.o
+endif
+
+ifeq ($(INIT_DEVICE_X909T), true)
+obj-$(CONFIG_FB_MSM_MIPI_DSI_ORISE) += mipi_orise_909t.o
+endif
+# OPPO Neal modify end
+
 obj-$(CONFIG_FB_MSM_MIPI_DSI_RENESAS) += mipi_renesas.o
 obj-$(CONFIG_FB_MSM_MIPI_DSI_TRULY) += mipi_truly.o
 obj-$(CONFIG_FB_MSM_MIPI_DSI_NT35510) += mipi_NT35510.o
@@ -198,7 +213,14 @@ endif
 obj-$(CONFIG_MSM_VIDC_1080P) += vidc/
 obj-$(CONFIG_MSM_VIDC_720P) += vidc/
 # OPPO 2012-08-10 zhengzk added begin for lm3528
+ifeq ($(INIT_DEVICE_X909), true)
+obj-$(CONFIG_FB_MSM_MIPI_BACKLIGHT_LM3528) += lm3528_909.o
+endif
+
+ifeq ($(INIT_DEVICE_X909T), true)
 obj-$(CONFIG_FB_MSM_MIPI_BACKLIGHT_LM3528) += lm3528.o
-# OPPO 2012-08-10 zhengzk added end
+obj-$(CONFIG_FB_MSM_MIPI_BACKLIGHT_LM3630) += lm3630_bl_909t.o
+endif
+# OPPO Neal modify end
 clean:
 	rm *.o .*cmd
