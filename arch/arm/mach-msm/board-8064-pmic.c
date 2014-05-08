@@ -29,7 +29,9 @@
 #include <mach/socinfo.h>
 #include "devices.h"
 #include "board-8064.h"
-
+/*OPPO yuyi add for N1*/
+#include "linux/pcb_version.h"
+/*yuyi add end*/
 struct pm8xxx_gpio_init {
 	unsigned			gpio;
 	struct pm_gpio			config;
@@ -116,6 +118,38 @@ struct pm8xxx_mpp_init {
 static struct pm8xxx_gpio_init pm8921_gpios[] __initdata = {
 	PM8921_GPIO_OUTPUT(14, 1, HIGH),	/* HDMI Mux Selector */
 	PM8921_GPIO_OUTPUT(23, 0, HIGH),	/* touchscreen power FET */
+	
+/* OPPO 2012-11-30 huyu modify for boot LOGO bluescreen*/
+#ifndef CONFIG_VENDOR_EDIT	
+	PM8921_GPIO_OUTPUT_BUFCONF(25, 0, LOW, CMOS), /* DISP_RESET_N */
+	PM8921_GPIO_OUTPUT_FUNC(26, 0, PM_GPIO_FUNC_2), /* Bl: Off, PWM mode */
+#else
+	PM8921_GPIO_OUTPUT_BUFCONF(25, 1, LOW, CMOS), /* DISP_RESET_N */
+#endif
+	PM8921_GPIO_OUTPUT_VIN(30, 1, PM_GPIO_VIN_VPH), /* SMB349 susp line */
+	PM8921_GPIO_OUTPUT_BUFCONF(36, 1, LOW, OPEN_DRAIN),
+	PM8921_GPIO_OUTPUT_FUNC(44, 0, PM_GPIO_FUNC_2),
+	PM8921_GPIO_OUTPUT(33, 0, HIGH),
+	PM8921_GPIO_OUTPUT(20, 0, HIGH),
+	PM8921_GPIO_INPUT(35, PM_GPIO_PULL_UP_30),
+	PM8921_GPIO_INPUT(38, PM_GPIO_PULL_UP_30),
+	/* TABLA CODEC RESET */
+	PM8921_GPIO_OUTPUT(34, 0, MED),
+	PM8921_GPIO_OUTPUT(13, 0, HIGH),               /* PCIE_CLK_PWR_EN */
+	PM8921_GPIO_INPUT(12, PM_GPIO_PULL_UP_30),     /* PCIE_WAKE_N */
+};
+
+static struct pm8xxx_gpio_init pm8921_gpios_n1[] __initdata = {
+	PM8921_GPIO_OUTPUT(14, 1, HIGH),	/* HDMI Mux Selector */
+	PM8921_GPIO_OUTPUT(23, 0, HIGH),	/* touchscreen power FET */
+
+	PM8921_GPIO_INPUT(26, PM_GPIO_PULL_UP_30),
+	PM8921_GPIO_INPUT(27, PM_GPIO_PULL_UP_30),
+	PM8921_GPIO_INPUT(28, PM_GPIO_PULL_UP_30),
+	
+	/* OPPO 2013-07-29 sjc add for reason */
+	PM8921_GPIO_INPUT(29, PM_GPIO_PULL_UP_30),
+	/* OPPO 2013-07-29 sjc add end */
 /* OPPO 2012-11-30 huyu modify for boot LOGO bluescreen*/
 #ifndef CONFIG_VENDOR_EDIT	
 	PM8921_GPIO_OUTPUT_BUFCONF(25, 0, LOW, CMOS), /* DISP_RESET_N */
@@ -180,10 +214,20 @@ static struct pm8xxx_gpio_init pm8921_mpq_gpios[] __initdata = {
 
 /* Initial PM8XXX MPP configurations */
 static struct pm8xxx_mpp_init pm8xxx_mpps[] __initdata = {
+/*OPPO yuyi modify*/
+#if 0
 	PM8921_MPP_INIT(3, D_OUTPUT, PM8921_MPP_DIG_LEVEL_VPH, DOUT_CTRL_LOW),
+#else
+	PM8921_MPP_INIT(3, D_INPUT, PM8921_MPP_DIG_LEVEL_S4, DIN_TO_INT),
+#endif
+/*modify end*/
 	/* External 5V regulator enable; shared by HDMI and USB_OTG switches. */
 	PM8921_MPP_INIT(7, D_OUTPUT, PM8921_MPP_DIG_LEVEL_VPH, DOUT_CTRL_LOW),
+#if 0 
 	PM8921_MPP_INIT(8, D_OUTPUT, PM8921_MPP_DIG_LEVEL_S4, DOUT_CTRL_LOW),
+#else
+	PM8921_MPP_INIT(8, D_INPUT, PM8921_MPP_DIG_LEVEL_S4, DIN_TO_INT),
+#endif
 	/*MPP9 is used to detect docking station connection/removal on Liquid*/
 	PM8921_MPP_INIT(9, D_INPUT, PM8921_MPP_DIG_LEVEL_S4, DIN_TO_INT),
 	/* PCIE_RESET_N */
@@ -213,7 +257,16 @@ void __init apq8064_pm8xxx_gpio_mpp_init(void)
 	int i, rc;
 
 	if (socinfo_get_pmic_model() != PMIC_MODEL_PM8917)
-		apq8064_configure_gpios(pm8921_gpios, ARRAY_SIZE(pm8921_gpios));
+		{
+		/*OPPO yuyi modify begin for N1*/
+		if( get_pcb_version() >=  PCB_VERSION_EVT_N1) {
+			apq8064_configure_gpios(pm8921_gpios_n1, ARRAY_SIZE(pm8921_gpios_n1));			
+			}
+		else {
+			apq8064_configure_gpios(pm8921_gpios, ARRAY_SIZE(pm8921_gpios));
+			}
+		/*OPPO yuyi modify end*/
+		}
 	else
 		apq8064_configure_gpios(pm8917_gpios, ARRAY_SIZE(pm8917_gpios));
 
@@ -280,6 +333,12 @@ static struct led_info pm8921_led_info[] = {
 /* OPPO 2013-04-10 wangjw change end */
 		.default_trigger	= "ac-online",
 	},
+	/* OPPO 2013-07-24 liubin Add for strobe light start */
+	[1] = {
+		.name 			= "strobe-light",
+		.default_trigger	= "default-off",
+	},
+	/* OPPO 2013-07-24 liubin Add end */
 };
 
 static struct led_platform_data pm8921_led_core_pdata = {
@@ -325,6 +384,16 @@ static struct pm8xxx_led_config pm8921_led_configs[] = {
 #endif
 /* OPPO 2012-11-15 wangjw Delete end */
 	},
+	
+	/* OPPO 2013-07-24 liubin Add for strobe light start */
+	[1] = {
+		.id = PM8XXX_ID_LED_KB_LIGHT,
+		.mode = PM8XXX_LED_MODE_MANUAL,
+		.max_current = 300,
+		.pwm_channel = -1,
+		.pwm_period_us = PM8XXX_LED_PWM_PERIOD,
+	},
+	/* OPPO 2013-07-24 liubin Add end */
 };
 
 static struct pm8xxx_led_platform_data apq8064_pm8921_leds_pdata = {
@@ -623,6 +692,10 @@ void __init apq8064_init_pmic(void)
 
 	if (machine_is_apq8064_mtp()) {
 		apq8064_pm8921_bms_pdata.battery_type = BATT_PALLADIUM;
+		/* OPPO 2013-07-19 sjc Add begin for reason Qcom*/
+		if (get_pcb_version() >= PCB_VERSION_EVT_N1)
+			apq8064_pm8921_chg_pdata.disable_chg_rmvl_wrkarnd = 1;//sjc add
+		/* OPPO 2013-07-19 sjc Add end */
 	} else if (machine_is_apq8064_liquid()) {
 		apq8064_pm8921_bms_pdata.battery_type = BATT_DESAY;
 	} else if (machine_is_apq8064_cdp()) {

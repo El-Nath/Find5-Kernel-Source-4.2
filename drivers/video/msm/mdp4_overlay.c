@@ -2377,122 +2377,105 @@ static int mdp4_overlay_req2pipe(struct mdp_overlay *req, int mixer,
 		pr_err("%s: mfd == NULL, -ENODEV\n", __func__);
 		return -ENODEV;
 	}
-	
-/* OPPO 2013-08-06 huanggd Modify for reduce printk rate*/	
+
 	if (mixer >= MDP4_MIXER_MAX) {
-		if (printk_ratelimit())	
-			pr_err("%s: mixer out of range!\n", __func__);
+		pr_err("%s: mixer out of range!\n", __func__);
 		mdp4_stat.err_mixer++;
 		return -ERANGE;
 	}
 
 	if (req->z_order < 0 || req->z_order > 3) {
-		if (printk_ratelimit())	
-			pr_err("%s: z_order=%d out of range!\n", __func__,
+		pr_err("%s: z_order=%d out of range!\n", __func__,
 				req->z_order);
 		mdp4_stat.err_zorder++;
 		return -ERANGE;
 	}
 
 	if (req->src_rect.h > 0xFFF) {
-		if (printk_ratelimit())	
-			pr_err("%s: src_h is out of range: 0X%x!\n",
-		       	__func__, req->src_rect.h);
+		pr_err("%s: src_h is out of range: 0X%x!\n",
+		       __func__, req->src_rect.h);
 		mdp4_stat.err_size++;
 		return -EINVAL;
 	}
 
 	if (req->src_rect.w > 0xFFF) {
-		if (printk_ratelimit())	
-			pr_err("%s: src_w is out of range: 0X%x!\n",
-		       	__func__, req->src_rect.w);
+		pr_err("%s: src_w is out of range: 0X%x!\n",
+		       __func__, req->src_rect.w);
 		mdp4_stat.err_size++;
 		return -EINVAL;
 	}
 
 	if (req->src_rect.x > 0xFFF) {
-		if (printk_ratelimit())	
-			pr_err("%s: src_x is out of range: 0X%x!\n",
-		       	__func__, req->src_rect.x);
+		pr_err("%s: src_x is out of range: 0X%x!\n",
+		       __func__, req->src_rect.x);
 		mdp4_stat.err_size++;
 		return -EINVAL;
 	}
 
 	if (req->src_rect.y > 0xFFF) {
-		if (printk_ratelimit())	
-			pr_err("%s: src_y is out of range: 0X%x!\n",
-		      		__func__, req->src_rect.y);
+		pr_err("%s: src_y is out of range: 0X%x!\n",
+		       __func__, req->src_rect.y);
 		mdp4_stat.err_size++;
 		return -EINVAL;
 	}
 
 	if (req->dst_rect.h > 0xFFF) {
-		if (printk_ratelimit())	
-			pr_err("%s: dst_h is out of range: 0X%x!\n",
-		       	__func__, req->dst_rect.h);
+		pr_err("%s: dst_h is out of range: 0X%x!\n",
+		       __func__, req->dst_rect.h);
 		mdp4_stat.err_size++;
 		return -EINVAL;
 	}
 
 	if (req->dst_rect.w > 0xFFF) {
-		if (printk_ratelimit())	
-			pr_err("%s: dst_w is out of range: 0X%x!\n",
-		       	__func__, req->dst_rect.w);
+		pr_err("%s: dst_w is out of range: 0X%x!\n",
+		       __func__, req->dst_rect.w);
 		mdp4_stat.err_size++;
 		return -EINVAL;
 	}
 
 	if (req->dst_rect.x > 0xFFF) {
-		if (printk_ratelimit())	
-			pr_err("%s: dst_x is out of range: 0X%x!\n",
-		       	__func__, req->dst_rect.x);
+		pr_err("%s: dst_x is out of range: 0X%x!\n",
+		       __func__, req->dst_rect.x);
 		mdp4_stat.err_size++;
 		return -EINVAL;
 	}
 
 	if (req->dst_rect.y > 0xFFF) {
-		if (printk_ratelimit())	
-			pr_err("%s: dst_y is out of range: 0X%x!\n",
-		       	__func__, req->dst_rect.y);
+		pr_err("%s: dst_y is out of range: 0X%x!\n",
+		       __func__, req->dst_rect.y);
 		mdp4_stat.err_size++;
 		return -EINVAL;
 	}
 
 	if (req->src_rect.h == 0 || req->src_rect.w == 0) {
-		if (printk_ratelimit())	
-			pr_err("%s: src img of zero size!\n", __func__);
+		pr_err("%s: src img of zero size!\n", __func__);
 		mdp4_stat.err_size++;
 		return -EINVAL;
 	}
 
 	if (req->dst_rect.h > (req->src_rect.h * upscale_max)) {
 		mdp4_stat.err_scale++;
-		if (printk_ratelimit())	
-			pr_err("%s: scale up, too much (h)!\n", __func__);
+		pr_err("%s: scale up, too much (h)!\n", __func__);
 		return -ERANGE;
 	}
 
 	if (req->src_rect.h > (req->dst_rect.h * 8)) {	/* too little */
 		mdp4_stat.err_scale++;
-		if (printk_ratelimit())	
-			pr_err("%s: scale down, too little (h)!\n", __func__);
+		pr_err("%s: scale down, too little (h)!\n", __func__);
 		return -ERANGE;
 	}
 
 	if (req->dst_rect.w > (req->src_rect.w * upscale_max)) {
 		mdp4_stat.err_scale++;
-		if (printk_ratelimit())	
-			pr_err("%s: scale up, too much (w)!\n", __func__);
+		pr_err("%s: scale up, too much (w)!\n", __func__);
 		return -ERANGE;
 	}
 
 	if (req->src_rect.w > (req->dst_rect.w * 8)) {	/* too little */
 		mdp4_stat.err_scale++;
-		if (printk_ratelimit())	
-			pr_err("%s: scale down, too little (w)!\n", __func__);
+		pr_err("%s: scale down, too little (w)!\n", __func__);
 		return -ERANGE;
 	}
-/* OPPO 2013-08-06 huanggd Modify end*/
 
 	if (mdp_hw_revision == MDP4_REVISION_V1) {
 		/*  non integer down saceling ratio  smaller than 1/4
@@ -2630,83 +2613,64 @@ static int mdp4_overlay_req2pipe(struct mdp_overlay *req, int mixer,
 
 	return 0;
 }
-/* OPPO 2013.7.5 Neal modify for blue screen */
 
 static int mdp4_calc_req_mdp_clk(struct msm_fb_data_type *mfd,
-				 u32 src_h, u32 dst_h, u32 src_w, u32 dst_w)
-
+                                                            u32 src_h, u32 dst_h, u32 src_w, u32 dst_w)
 {
-	u32 pclk,hsync;
+	u32 pclk, hsync;
 	u32 xscale, yscale;
-
 	u32 shift = 16;
 	u64 rst;
 
-/*
-	pr_debug("%s: pipe sets: panel res(x,y)=(%d,%d)\n src(w,h)(%d,%d),src(x,y)(%d,%d)\n dst(w,h)(%d,%d),dst(x,y)(%d,%d)",
-		 __func__,  mfd->panel_info.xres, mfd->panel_info.yres,pipe->src_w, pipe->src_h, pipe->src_x, pipe->src_y,pipe->dst_w, pipe->dst_h, pipe->dst_x, pipe->dst_y);
-	pr_debug("%s: src(w,h)(%d,%d),src(x,y)(%d,%d)\n",
-		 __func__,  pipe->src_w, pipe->src_h, pipe->src_x, pipe->src_y);
-	pr_debug("%s: dst(w,h)(%d,%d),dst(x,y)(%d,%d)\n",
-		 __func__, pipe->dst_w, pipe->dst_h, pipe->dst_x, pipe->dst_y);
-*/
-	pr_debug("%s: pipe sets: panel res(x,y)=(%d,%d)\n",
-			 __func__,	mfd->panel_info.xres, mfd->panel_info.yres);
-		pr_debug("%s: src_h=%d, dst_h=%d, src_w=%d, dst_w=%d\n",
-			 __func__, src_h, dst_h, src_w, dst_w);
-
-
+	pr_debug("%s: pipe sets: panel res(x,y)=(%d,%d)\n src_h=%d, dst_h=%d, src_w=%d, dst_w=%d\n",
+			__func__, mfd->panel_info.xres, mfd->panel_info.yres,src_h, dst_h, src_w, dst_w);
 	pclk = (mfd->panel_info.type == MIPI_VIDEO_PANEL ||
-		mfd->panel_info.type == MIPI_CMD_PANEL) ?
-		mfd->panel_info.mipi.dsi_pclk_rate :
-		mfd->panel_info.clk_rate;
+			mfd->panel_info.type == MIPI_CMD_PANEL) ?
+			mfd->panel_info.mipi.dsi_pclk_rate :
+			mfd->panel_info.clk_rate;
 	if (!pclk) {
-
-		pr_debug("%s panel pixel clk is zero!\n", __func__);
-
+		pr_err("%s panel pixel clk is zero!\n", __func__);
 		return mdp_max_clk;
 	}
 
 	pr_debug("%s: mdp panel pixel clk is %d.\n", __func__, pclk);
 
 	hsync = mfd->panel_info.lcdc.h_back_porch +
-		mfd->panel_info.lcdc.h_front_porch +
-		mfd->panel_info.lcdc.h_pulse_width +
-		mfd->panel_info.xres;
-
+			mfd->panel_info.lcdc.h_front_porch +
+			mfd->panel_info.lcdc.h_pulse_width +
+			mfd->panel_info.xres;
 	/*
-	* For the scaling cases, adding extra 20% margin
-	 */
+	  * For the scaling cases, adding extra 20% margin
+	  */
 	if ((src_h != dst_h) || (src_w != dst_w)) {
 		hsync *= 100;
 		hsync /= 120;
 	}
 
 	if (!hsync) {
-
-		pr_debug("%s: panel hsync is zero!\n", __func__);
+		pr_err("%s: panel hsync is zero!\n", __func__);
 		return mdp_max_clk;
-		}
+	}
 
 	pr_debug("%s: panel hsync is %d.\n", __func__, hsync);
 
 	if (!src_h) {
-		pr_debug("%s: src_h is zero!\n", __func__);
+		pr_err("%s: src_h is zero!\n", __func__);
 		return mdp_max_clk;
 	}
 
 	if (!dst_h) {
-		pr_debug("%s: dst_h is zero!\n", __func__);
+		pr_err("%s: dst_h is zero!\n", __func__);
 		return mdp_max_clk;
 	}
-
+	
 	if (!src_w) {
-		pr_debug("%s: src_w is zero!\n", __func__);
+		pr_err("%s: src_w is zero!\n", __func__);
 		return mdp_max_clk;
 	}
 
 	if (!dst_w) {
-		pr_debug("%s: dst_w is zero!\n", __func__);
+		pr_err("%s: dst_w is zero!\n", __func__);
 		return mdp_max_clk;
 	}
 
@@ -2714,9 +2678,7 @@ static int mdp4_calc_req_mdp_clk(struct msm_fb_data_type *mfd,
 	xscale += src_w;
 
 	if (xscale < dst_w) {
-
-		pr_debug("%s: xres+src_w cannot be less than dst_w!\n",
-		       __func__);
+		pr_err("%s: xres+src_w cannot be less than dst_w!\n", __func__);
 		return mdp_max_clk;
 	}
 
@@ -2724,13 +2686,13 @@ static int mdp4_calc_req_mdp_clk(struct msm_fb_data_type *mfd,
 	xscale <<= shift;
 	xscale /= hsync;
 	pr_debug("%s: the right %d shifted xscale is %d.\n",
-		 __func__, shift, xscale);
+			__func__, shift, xscale);
 
 	if (src_h > dst_h) {
-		yscale = src_h;  
+		yscale = src_h;
 		yscale <<= shift;
 		yscale /= dst_h;
-	} else {		/* upscale */
+	} else { /* upscale */
 		yscale = dst_h;
 		yscale <<= shift;
 		yscale /= src_h;
@@ -2738,7 +2700,7 @@ static int mdp4_calc_req_mdp_clk(struct msm_fb_data_type *mfd,
 
 	yscale *= src_w;
 	yscale /= hsync;
-
+	
 	pr_debug("%s: the right %d shifted yscale is %d.\n",
 		 __func__, shift, yscale);
 		 
@@ -2756,7 +2718,7 @@ static int mdp4_calc_req_mdp_clk(struct msm_fb_data_type *mfd,
 	 * 4 lines input during back porch time if scaling is
 	 * required(FIR).
 	 */
-	if ((mfd->panel_info.lcdc.v_back_porch < 4) &&
+	if ((mfd->panel_info.lcdc.v_back_porch <= 4) &&
 	    (src_h != dst_h) &&
 	    (mfd->panel_info.lcdc.v_back_porch)) {
 		u32 clk = 0;
@@ -2778,76 +2740,76 @@ static int mdp4_calc_req_mdp_clk(struct msm_fb_data_type *mfd,
 		pr_debug("%s calculated mdp clk is less than pclk.\n",
 			__func__);
 	}
-
 	pr_debug("%s: required mdp clk %d\n", __func__, (u32)rst);
-	
-		return (u32)rst;
-	}
-	
-	static int mdp4_calc_req_blt(struct msm_fb_data_type *mfd,
-					 struct mdp_overlay *req)
-	{
-		int ret = 0;
 
+	return (u32)rst;
+}
 
-	if (!req) {
-		pr_debug("%s: req is null!\n", __func__);
-		return ret;
-	}
+static int mdp4_calc_req_blt(struct msm_fb_data_type *mfd,
+								struct mdp_overlay *req)
+{
+    int ret = 0;
 
-	if (!mfd) {
-		pr_debug("%s: mfd is null!\n", __func__);
-		return ret;
-	}
-
-	if (mdp4_calc_req_mdp_clk
-		(mfd, req->src_rect.h, req->dst_rect.h,
-		 req->src_rect.w, req->dst_rect.w) > mdp_max_clk)
-		ret = -EINVAL;
-
-	return ret;
+    if (!req) {
+    	pr_err("%s: req is null!\n", __func__);
+    	return ret;
+    }
+    
+    if (!mfd) {
+    	pr_err("%s: mfd is null!\n", __func__);
+    	return ret;
+    }
+ /*
+  * Neal required mdp core clk > mdp max core clk ,so let gpu handle it
+  *
+ */
+    if (mdp4_calc_req_mdp_clk
+    		(mfd, req->src_rect.h, req->dst_rect.h,
+    		req->src_rect.w, req->dst_rect.w) > mdp_max_clk)
+    			ret = -EINVAL;
+    
+    return ret;
 }
 
 static int mdp4_calc_pipe_mdp_clk(struct msm_fb_data_type *mfd,
 				  struct mdp4_overlay_pipe *pipe)
 {
-	int ret = -EINVAL;
-	u32 shift = 16;
 
-	if (!pipe) {
-		pr_debug("%s: pipe is null!\n", __func__);
-		return ret;
-	}
-	if (!mfd) {
-		pr_debug("%s: mfd is null!\n", __func__);
-		return ret;
-	}
+    int ret = -EINVAL;
+    
+    if (!pipe) {
+    	pr_err("%s: pipe is null!\n", __func__);
+    	return ret;
+    }
+    if (!mfd) {
+    	pr_err("%s: mfd is null!\n", __func__);
+    	return ret;
+    }
+    
+    /*
+    * Serveral special cases require the max mdp clk but cannot
+    * be explained by mdp clk equation.
+    */
+    if (pipe->flags & MDP_DEINTERLACE) {
+    	pr_info("%s deinterlace requires max mdp clk.\n", __func__);
+    	pipe->req_clk = mdp_max_clk;
+    	return 0;
+    }
+    
+    pr_debug("%s: src(w,h)(%d,%d),src(x,y)(%d,%d)\n",
+    			__func__, pipe->src_w, pipe->src_h, pipe->src_x, pipe->src_y);
+    pr_debug("%s: dst(w,h)(%d,%d),dst(x,y)(%d,%d)\n",
+    			__func__, pipe->dst_w, pipe->dst_h, pipe->dst_x, pipe->dst_y);
+    
+    pipe->req_clk = mdp4_calc_req_mdp_clk
+    			(mfd, pipe->src_h, pipe->dst_h, pipe->src_w, pipe->dst_w);
 
-	/*
-	 * Serveral special cases require the max mdp clk but cannot
-	 * be explained by mdp clk equation.
-	 */
-	if (pipe->flags & MDP_DEINTERLACE) {
-		pr_debug("%s deinterlace requires max mdp clk.\n",
-			__func__);
-		pipe->req_clk = mdp_max_clk;
-		return 0;
-	}
+    pr_debug("%s: required mdp clk %d mixer %d pipe ndx %d\n",
+			__func__, pipe->req_clk, pipe->mixer_num, pipe->pipe_ndx);
 
-	pr_debug("%s: src(w,h)(%d,%d),src(x,y)(%d,%d)\n",
-		 __func__,  pipe->src_w, pipe->src_h, pipe->src_x, pipe->src_y);
-	pr_debug("%s: dst(w,h)(%d,%d),dst(x,y)(%d,%d)\n",
-		 __func__, pipe->dst_w, pipe->dst_h, pipe->dst_x, pipe->dst_y);
-
-	pipe->req_clk = mdp4_calc_req_mdp_clk
-		(mfd, pipe->src_h, pipe->dst_h, pipe->src_w, pipe->dst_w);
-	pr_debug("Neal %s: required mdp clk %d mixer %d pipe ndx %d\n",
-		 __func__, pipe->req_clk, pipe->mixer_num, pipe->pipe_ndx);
-
-		pipe->req_clk = (((pipe->req_clk) >> shift) * 23 / 20) << shift;
-	return 0;
+    return 0;
 }
-/* OPPO 2013.7.5 Neal modify end */
+
 static int mdp4_calc_pipe_mdp_bw(struct msm_fb_data_type *mfd,
 			 struct mdp4_overlay_pipe *pipe)
 {
@@ -2887,9 +2849,9 @@ static int mdp4_calc_pipe_mdp_bw(struct msm_fb_data_type *mfd,
 	pipe->bw_ab_quota <<= shift;
 	pipe->bw_ib_quota <<= shift;
 
-	pr_debug("%s: pipe ndx=%d src(h,w)(%d, %d) fps=%d bpp=%d ab_quota=%llu ib_quota=%llu\n",
+	pr_debug("%s: pipe ndx=%d src(h,w)(%d, %d) fps=%d bpp=%d\n",
 		 __func__, pipe->pipe_ndx,  pipe->src_h, pipe->src_w,
-		 fps, pipe->bpp,pipe->bw_ab_quota, pipe->bw_ib_quota);
+		 fps, pipe->bpp);
 	pr_debug("%s: ab_quota=%llu ib_quota=%llu\n", __func__,
 		 pipe->bw_ab_quota, pipe->bw_ib_quota);
 
@@ -3019,13 +2981,10 @@ int mdp4_overlay_mdp_perf_req(struct msm_fb_data_type *mfd)
 		cnt++;
 		if (worst_mdp_clk < pipe->req_clk)
 			worst_mdp_clk = pipe->req_clk;
-/* OPPO Neal modify for black screen*/
+
 		if (pipe->req_clk > mdp_max_clk)
-		{
-			pipe->req_clk = mdp_max_clk;
-			//perf_req->use_ov_blt[pipe->mixer_num] = 1;
-		}
-/* OPPO Neal modify end*/
+			perf_req->use_ov_blt[pipe->mixer_num] = 1;
+
 		if (pipe->mixer_num == MDP4_MIXER2)
 			perf_req->use_ov_blt[MDP4_MIXER2] = 1;
 
@@ -3109,13 +3068,13 @@ int mdp4_overlay_mdp_perf_req(struct msm_fb_data_type *mfd)
 		 ab_quota_total, perf_req->mdp_ab_bw,
 		 ib_quota_total, perf_req->mdp_ib_bw);
 /* OPPO Gousj modify for stop warn*/
-	if (ab_quota_total > mdp_max_bw)
-		pr_debug("%s: req ab bw=%llu is larger than max bw=%llu",
+/*	if (ab_quota_total > mdp_max_bw)
+		pr_warn("%s: req ab bw=%llu is larger than max bw=%llu",
 			__func__, ab_quota_total, mdp_max_bw);
 	if (ib_quota_total > mdp_max_bw)
-		pr_debug("%s: req ib bw=%llu is larger than max bw=%llu",
+		pr_warn("%s: req ib bw=%llu is larger than max bw=%llu",
 			__func__, ib_quota_total, mdp_max_bw);
-
+*/
 	pr_debug("%s %d: pid %d cnt %d clk %d ov0_blt %d, ov1_blt %d\n",
 		 __func__, __LINE__, current->pid, cnt,
 		 perf_req->mdp_clk_rate,
@@ -3407,23 +3366,19 @@ int mdp4_overlay_set(struct fb_info *info, struct mdp_overlay *req)
 	}
 
 	mixer = mfd->panel_info.pdest;	/* DISPLAY_1 or DISPLAY_2 */
-/* OPPO 2013.7.5 Neal modify for blue screen */
 	ret = mdp4_calc_req_blt(mfd, req);
+
+	if (ret < 0) {
+		mutex_unlock(&mfd->dma->ov_mutex);
+		pr_err("%s: blt mode is required! ret=%d\n", __func__, ret);
+		return ret;
+	}
 	
-		if (ret < 0) {
-			mutex_unlock(&mfd->dma->ov_mutex);
-			pr_debug("%s: blt mode is required! ret=%d\n", __func__, ret);
-			return ret;
-		}
-/* OPPO 2013.7.5 Neal modify end */
 	ret = mdp4_overlay_req2pipe(req, mixer, &pipe, mfd);
 
 	if (ret < 0) {
 		mutex_unlock(&mfd->dma->ov_mutex);
-/* OPPO 2013-08-06 huanggd Modify for reduce printk rate*/		
-		if (printk_ratelimit())		
-			pr_err("%s: mdp4_overlay_req2pipe, ret=%d\n", __func__, ret);
-/* OPPO 2013-08-06 huanggd Modify end*/				
+		pr_err("%s: mdp4_overlay_req2pipe, ret=%d\n", __func__, ret);
 		return ret;
 	}
 
@@ -3462,12 +3417,6 @@ int mdp4_overlay_set(struct fb_info *info, struct mdp_overlay *req)
 		fill_black_screen(FALSE, pipe->pipe_num, pipe->mixer_num);
 
 	mdp4_overlay_mdp_pipe_req(pipe, mfd);
-	ret = mdp4_overlay_mdp_perf_req(mfd);
-
-	if (ret) {
-		mdp4_overlay_pipe_free(pipe);
-		pr_err("%s: blt mode should not be enabled\n", __func__);
-	}
 	mutex_unlock(&mfd->dma->ov_mutex);
 
 	return ret;

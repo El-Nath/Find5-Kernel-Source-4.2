@@ -41,6 +41,9 @@
 #include <linux/regulator/consumer.h>
 #include <linux/pcb_version.h>
 
+/*OPPO yuyi 2013-10-24 add begin for nfc and mainboard devinfo*/
+#include <mach/device_info.h>
+/*OPPO yuyi 2013-10-24 add end for nfc and mainboard devinfo*/
 //TODO:replace and include corresponding head file for VEN/IRQ/FIRM I/O configuration
 //#include <plat/gpio-core.h>
 //#include <plat/gpio-cfg.h>
@@ -75,6 +78,92 @@ struct pn544_dev
 	bool				irq_enabled;
 	spinlock_t			irq_enabled_lock;
 };
+/*OPPO yuyi 2013-10-24 add begin for nfc and mainboard devinfo*/
+struct manufacture_info mainboard_info;
+struct manufacture_info nfc_info = {
+	.version = "pn544",
+	.manufacture = "NXP",
+};
+static void nfc_verify(void)
+{
+	if(get_pcb_version() > PCB_VERSION_EVT_N1) {
+		nfc_info.version = "pn65o";
+	}
+}
+static void mainboard_verify(void)
+{
+	switch(get_pcb_version()) {
+		case PCB_VERSION_EVB:		
+			mainboard_info.version ="EVB";
+			break;
+		case PCB_VERSION_EVT:
+			mainboard_info.version = "EVT";
+			break;
+		case PCB_VERSION_DVT:
+			mainboard_info.version = "DVT";
+			break;
+		case PCB_VERSION_PVT:
+			mainboard_info.version = "PVT";
+			break;
+		case PCB_VERSION_EVB_TD:
+			mainboard_info.version = "EVB_TD";
+			break;
+		case PCB_VERSION_EVT_TD:
+			mainboard_info.version = "EVT_TD";
+			break;
+		case PCB_VERSION_DVT_TD:
+			mainboard_info.version = "DVT_TD";
+			break;
+		case PCB_VERSION_PVT_TD:
+			mainboard_info.version = "PVT_TD";
+			break;
+		case PCB_VERSION_PVT2_TD:
+			mainboard_info.version = "PVT2_TD";
+			break;
+		case PCB_VERSION_PVT3_TD:
+			mainboard_info.version = "PVT3_TD";
+			break;
+		case PCB_VERSION_EVT_N1:
+			mainboard_info.version = "EVT_N1T";
+			break;	
+		case PCB_VERSION_EVT_N1F:
+			mainboard_info.version = "EVT_N1F";
+			break;	
+		case PCB_VERSION_EVT3_N1F:
+			mainboard_info.version = "EVT3_N1F";
+			break;	
+		case PCB_VERSION_DVT_N1F:
+			mainboard_info.version = "DVT_N1F";
+			break;	
+		case PCB_VERSION_PVT_N1F:
+			mainboard_info.version = "PVT_N1F";
+			break;	
+		case PCB_VERSION_EVT3_N1T:
+			mainboard_info.version = "EVT3_N1T";
+			break;	
+		case PCB_VERSION_DVT_N1T:
+			mainboard_info.version = "DVT_N1T";
+			break;	
+		case PCB_VERSION_PVT_N1T:
+			mainboard_info.version = "PVT_N1T";
+			break;	
+		case PCB_VERSION_EVT_N1W:
+			mainboard_info.version = "EVT_N1W";
+			break;	
+		case PCB_VERSION_DVT_N1W:
+		    mainboard_info.version = "DVT_N1W";
+			break;	
+		case PCB_VERSION_PVT_N1W:
+			mainboard_info.version = "PVT_N1W";
+			break;
+		default:
+			mainboard_info.version = "UNKOWN";
+		}
+	mainboard_info.manufacture = "SA";
+	
+}
+			
+/*OPPO yuyi 2013-10-24 add end for nfc and mainboard devinfo*/
 
 static void pn544_disable_irq(struct pn544_dev *pn544_dev)
 {
@@ -343,7 +432,7 @@ static int pn544_power(int on)
 				goto lvs5_get_failed;
 			}
 		}
-		else {
+		else if( (get_pcb_version() > PCB_VERSION_EVT) && (get_pcb_version() <= PCB_VERSION_EVT_N1)) {
 		//dvt---l21
 			ldo121 = regulator_get(NULL, "8921_l21");
 			if (IS_ERR(ldo121)){
@@ -371,7 +460,7 @@ static int pn544_power(int on)
 				regulator_disable(lvs5);
 				regulator_put(lvs5);
 			}
-	    }else { //dvt
+	    }else if( (get_pcb_version() > PCB_VERSION_EVT) && (get_pcb_version() <= PCB_VERSION_EVT_N1)){ //dvt
 			if (ldo121) {
 				regulator_disable(ldo121);
 				regulator_put(ldo121);
@@ -409,6 +498,12 @@ static int pn544_probe(struct i2c_client *client, const struct i2c_device_id *id
 	//printk(" power up nfc yuyi-------------------------------------\n");
 /* OPPO 2012-07-20 liuhd Add end */
 
+/*OPPO yuyi 2013-10-24 add begin for nfc_devinfo*/
+	nfc_verify();
+	register_device_proc("nfc", nfc_info.version, nfc_info.manufacture);
+	mainboard_verify();
+	register_device_proc("mainboard", mainboard_info.version, mainboard_info.manufacture);
+/*OPPO yuyi 2013-10-24 add end for nfc_devinfo*/
 	if (platform_data == NULL) {
 		pr_err("%s : nfc probe fail\n", __func__);
 		return  -ENODEV;

@@ -380,17 +380,48 @@ enum vdd_dig_levels {
 	VDD_DIG_NUM
 };
 
+#ifdef CONFIG_USERSPACE_GPU_CONTROL
+#define GPU_MIN_VDD           900
+#define GPU_MAX_VDD          1200
+
+static int vdd_uv[] = {
+  [VDD_DIG_NONE]    =       0,
+  [VDD_DIG_LOW]     =  945000,
+  [VDD_DIG_NOMINAL] = 1050000,
+  [VDD_DIG_HIGH]    = 1150000
+};
+
+ssize_t get_gpu_vdd_levels_str(char *buf)
+{
+  int i, len = 0;
+
+  if (buf) {
+	for (i = 1; i <= 3; i++) {
+		len += sprintf(buf + len, "%i mV\n", vdd_uv[i]/1000);
+		}
+	}
+  return len;
+}
+
+void set_gpu_vdd_levels(int uv_tbl[])
+{
+  int i;
+  for (i = 1; i <= 3; i++)
+  {
+	vdd_uv[i] = (min(max(uv_tbl[i - 1],
+			GPU_MIN_VDD), GPU_MAX_VDD))*1000;
+  }
+}
+
 static int set_vdd_dig_8960(struct clk_vdd_class *vdd_class, int level)
 {
-	static const int vdd_uv[] = {
-		[VDD_DIG_NONE]    =       0,
-		[VDD_DIG_LOW]     =  945000,
-		[VDD_DIG_NOMINAL] = 1050000,
-		[VDD_DIG_HIGH]    = 1150000
-	};
-	return rpm_vreg_set_voltage(RPM_VREG_ID_PM8921_S3, RPM_VREG_VOTER3,
-				    vdd_uv[level], 1150000, 1);
+  int ret;
+  ret = rpm_vreg_set_voltage(RPM_VREG_ID_PM8921_S3, RPM_VREG_VOTER3,
+            vdd_uv[level], vdd_uv[VDD_DIG_HIGH], 1);
+  //pr_alert("GPU VOLTAGE - %d - %d", vdd_uv[level], ret);
+  return ret;
 }
+#endif
 
 static DEFINE_VDD_CLASS(vdd_dig, set_vdd_dig_8960, VDD_DIG_NUM);
 
@@ -5340,7 +5371,13 @@ static struct clk_lookup msm_clocks_8064[] = {
 	CLK_LOOKUP("core_clk",		gsbi2_qup_clk.c,	""),
 	CLK_LOOKUP("core_clk",		gsbi3_qup_clk.c,	"qup_i2c.3"),
 	CLK_LOOKUP("core_clk",		gsbi4_qup_clk.c,	"qup_i2c.4"),
+	/* OPPO 2013-07-24 lanhe Modify for m9mo spi clock start */
+	#if 0
 	CLK_LOOKUP("core_clk",		gsbi5_qup_clk.c,	"spi_qsd.0"),
+	#else
+	CLK_LOOKUP("core_clk",		gsbi4_qup_clk.c,	"spi_qsd.0"),
+	#endif
+	/* OPPO 2013-07-24 lanhe Modify end */
 	CLK_LOOKUP("core_clk",		gsbi5_qup_clk.c,	"qup_i2c.5"),
 	CLK_LOOKUP("core_clk",		gsbi6_qup_clk.c,	""),
 /* OPPO 2013-02-04 kangjian Modify begin for s5k6a3yx's I2C */
@@ -5403,15 +5440,22 @@ static struct clk_lookup msm_clocks_8064[] = {
 	CLK_LOOKUP("iface_clk",		gsbi7_p_clk.c,	"msm_serial_hsl.0"),
 #endif
 #else
-
-
-	
+	/* OPPO 2013-07-24 lanhe Modify for m9mo spi clock start */
+	#if 0
 	CLK_LOOKUP("iface_clk",		gsbi5_p_clk.c,		"spi_qsd.0"),
+	#else
+	CLK_LOOKUP("iface_clk",		gsbi4_p_clk.c,		"spi_qsd.0"),
+	#endif
+	/* OPPO 2013-07-24 lanhe Modify end */
+	
 	CLK_LOOKUP("iface_clk",		gsbi5_p_clk.c,		"msm_serial_hsl.0"),
 	CLK_LOOKUP("iface_clk",		gsbi6_p_clk.c,		""),
 /* OPPO 2013-02-04 kangjian Modify begin for reason */
 	CLK_LOOKUP("iface_clk",		gsbi7_p_clk.c,	"qup_i2c.7"),
 /* OPPO 2013-02-04 kangjian Modify end */
+/* OPPO 2013-07-24 sjc Modify begin for reason */
+	CLK_LOOKUP("iface_clk",		gsbi5_p_clk.c,	"qup_i2c.5"),
+/* OPPO 2013-07-24 sjc Modify end */
 /* OPPO 2013-03-18 zhenwx  Modify end */
 #endif
 	CLK_LOOKUP("ref_clk",	tsif_ref_clk.c,	"msm_tspp.0"),
@@ -5444,6 +5488,9 @@ static struct clk_lookup msm_clocks_8064[] = {
 /* OPPO 2013-02-04 kangjian added start for sub camera's clk */
 	CLK_LOOKUP("cam_clk",		cam2_clk.c,	"0-0010"),
 	CLK_LOOKUP("cam_clk",		cam2_clk.c,	"7-0010"),
+	/* OPPO 2013-07-24 lanhe Add for m9mo clock start */
+	CLK_LOOKUP("cam_clk",		cam0_clk.c,	"7-003e"),
+	/* OPPO 2013-07-24 lanhe Add end */
 /* OPPO 2013-02-04 kangjian added end */
 	CLK_LOOKUP("csi_src_clk",	csi0_src_clk.c,		"msm_csid.0"),
 	CLK_LOOKUP("csi_src_clk",	csi1_src_clk.c,		"msm_csid.1"),

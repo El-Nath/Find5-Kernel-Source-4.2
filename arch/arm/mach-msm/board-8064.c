@@ -83,6 +83,11 @@
 /* OPPO 2013-02-20 yuyi Add end */
 #endif
 #include <linux/persistent_ram.h>
+/* OPPO 2013-07-31 Neal Add begin bkl*/
+#include <linux/pcb_version.h>
+
+extern int get_pcb_version(void);
+/* OPPO 2013-07-31 Neal Add begin bkl*/
 
 #include "msm_watchdog.h"
 #include "board-8064.h"
@@ -100,7 +105,11 @@
 #include <linux/synaptics_i2c_rmi.h>
 #endif
 /* OPPO 2012-07-31 liujun Add end */
-
+// oppo yanghai add
+#ifdef CONFIG_VENDOR_EDIT
+#include <linux/y8c20x66a_i2c_rmi.h>
+#endif
+//oppo yanghai add end
 #define MSM_PMEM_ADSP_SIZE         0x7800000
 #define MSM_PMEM_AUDIO_SIZE        0x4CF000
 #ifdef CONFIG_FB_MSM_HDMI_AS_PRIMARY
@@ -271,6 +280,8 @@ int __init board_pcb_verson_init(char *s)
 		current_pcb_version_num = PCB_VERSION_PVT2_TD;
 	else if (!strcmp(s, "td_pvt3"))
 		current_pcb_version_num = PCB_VERSION_PVT3_TD;
+	else if (!strcmp(s, "td_pvt4"))
+		current_pcb_version_num = PCB_VERSION_PVT4_TD;
 	/*OPPO 2013-08-23 zhangpan add pcb version for N1*/
 	else if (!strcmp(s, "n1t_evt"))
 		current_pcb_version_num = PCB_VERSION_EVT_N1;
@@ -394,30 +405,56 @@ static ssize_t sim_status_store(struct kobject *kobj, struct kobj_attribute *att
 
 
 struct kobj_attribute pininfo_attr = {
-    .attr = {"pin_info", 0660},
-	
+/* OPPO 2013-08-16 zhaokai Add begin for CTS android.permission test*/
+#ifdef OPPO_CTS
+.attr = {"pin_info", 0660},
+#else
+.attr = {"pin_info", 0777},
+#endif
+/* OPPO 2013-08-16 zhaokai Add end for CTS android.permission test*/
+    
     .show = &pininfo_show,
     .store = &pininfo_store
 };
 
 
 struct kobj_attribute modem_reset_count_attr = {
-    .attr = {"modem_reset_count", 0660},
+/* OPPO 2013-08-16 zhaokai Add begin for CTS android.permission test*/
+#ifdef OPPO_CTS
+.attr = {"modem_reset_count", 0660},
+#else
+.attr = {"modem_reset_count", 0777},
+#endif
+/* OPPO 2013-08-16 zhaokai Add end for CTS android.permission test*/
+    
 	
     .show = &modem_reset_count_show,
     .store = &modem_reset_count_store,
 };
 
 struct kobj_attribute need_pin_process_flag_attr = {
-    .attr = {"need_pin_process_flag", 0660},
+/* OPPO 2013-08-16 zhaokai Add begin for CTS android.permission test*/
+#ifdef OPPO_CTS
+ .attr = {"need_pin_process_flag", 0660},
+#else
+ .attr = {"need_pin_process_flag", 0777},
+#endif
+/* OPPO 2013-08-16 zhaokai Add end for CTS android.permission test*/
+   
 	
     .show = &need_pin_process_flag_show,
     .store = &need_pin_process_flag_store,
 };
 
 struct kobj_attribute sim_status_attr = {
-    .attr = {"sim_status", 0660},
-	
+/* OPPO 2013-08-16 zhaokai Add begin for CTS android.permission test*/
+#ifdef OPPO_CTS
+.attr = {"sim_status", 0660},
+#else
+.attr = {"sim_status", 0777},
+#endif
+/* OPPO 2013-08-16 zhaokai Add end for CTS android.permission test*/
+    
     .show = &sim_status_show,
     .store = &sim_status_store,
 };
@@ -1242,6 +1279,26 @@ static struct i2c_board_info smb349_charger_i2c_info[] __initdata = {
 		.platform_data	= &smb349_data,
 	},
 };
+/* OPPO 2013-07-08 sjc Add begin for smb358 */
+#include <linux/power/smb358_charger.h>
+static struct smb358_charger_platform_data  smb358_charger_pdata = {
+	.irq_gpio = PM8921_GPIO_PM_TO_SYS(29),
+	.max_charge_current = 2000,
+	.max_charge_voltage = 4500,
+};
+static struct i2c_board_info smb358_charger_i2c_info[] __initdata = {
+	{
+		I2C_BOARD_INFO(SMB358_CHARGER_NAME, 0x57),
+		.platform_data	= &smb358_charger_pdata,
+	},
+};
+//sjc add 2013-07-23
+static struct i2c_board_info bq27541_charger_i2c_info[] __initdata = {
+	{
+		I2C_BOARD_INFO("bq27541-gauge", 0x55),
+	},
+};
+/* OPPO 2013-07-08 sjc Add end */
 
 struct sx150x_platform_data apq8064_sx150x_data[] = {
 	[SX150X_EPM] = {
@@ -1831,7 +1888,9 @@ static struct i2c_board_info cyttsp_info[] __initdata = {
 
 #if defined(CONFIG_TOUCHSCREEN_SYNAPTICS_S3202_I2C_RMI)
 static struct regulator *vreg_tp_2P8V = NULL;
+static struct regulator *vreg_tp_1P8V = NULL;
 static DEFINE_MUTEX(TP_POWER_LOCK);
+static DEFINE_MUTEX(TP_BK_POWER_LOCK);
 
 static int init_tp_regulator(void)
 {
@@ -1874,25 +1933,54 @@ static int inline disable_tp_regulator(struct regulator *vreg_tp)
 	return rc;
 }
 
+static int oppo_total_touchscreen_power(struct regulator* regula,int on);
 static int oppo_touchscreen_power(int on)
 {
 	int rc = 0;
-
 	mutex_lock(&TP_POWER_LOCK);
+	if((rc = init_tp_regulator()) == 0)
+		rc = oppo_total_touchscreen_power(vreg_tp_2P8V,on);
+	mutex_unlock(&TP_POWER_LOCK);
+	return 	rc = 0;
+}
+static int oppo_touchpad_power(int on) {
+	int rc = 0;
 
-	rc = init_tp_regulator();
-	if (rc)
-		goto oppo_tp_power_return;
+    if((get_pcb_version() >= PCB_VERSION_EVT3_N1T)&&(get_pcb_version() <= PCB_VERSION_PVT_N1T)) {
+        
+        mutex_lock(&TP_BK_POWER_LOCK);
+
+	    if(vreg_tp_1P8V == NULL) {
+		    vreg_tp_1P8V = regulator_get(NULL, "8921_l21");						
+		    if (IS_ERR(vreg_tp_1P8V)) {
+			    mutex_unlock(&TP_BK_POWER_LOCK);
+			    return PTR_ERR(vreg_tp_1P8V);
+		    }
+	    }
+	    rc = oppo_total_touchscreen_power(vreg_tp_1P8V,on);
+
+	    mutex_unlock(&TP_BK_POWER_LOCK);
+
+	    return rc ;
+    
+    } else {
+        return rc;
+    }	
+}
+
+static int oppo_total_touchscreen_power(struct regulator* regula,int on)
+{
+	int rc = 0;
 
 	if(on == 0xEF)
 	{
 		// Power reset
-		rc = disable_tp_regulator(vreg_tp_2P8V);
+		rc = disable_tp_regulator(regula);
 		if (rc)
 			goto oppo_tp_power_return;
 		msleep(20);
 
-		rc = enable_tp_regulator(&vreg_tp_2P8V);
+		rc = enable_tp_regulator(&regula);
 		if (rc)
 			goto oppo_tp_power_return;
 		mdelay(50);
@@ -1902,7 +1990,7 @@ static int oppo_touchscreen_power(int on)
 	else if (on)
 	{
 		// Power on
-		rc = enable_tp_regulator(&vreg_tp_2P8V);
+		rc = enable_tp_regulator(&regula);
 		if (rc)
 			goto oppo_tp_power_return;
 		mdelay(50);
@@ -1912,17 +2000,16 @@ static int oppo_touchscreen_power(int on)
 	else
 	{
 		// Power off
-		rc = disable_tp_regulator(vreg_tp_2P8V);
+		rc = disable_tp_regulator(regula);
 		if (rc)
 			goto oppo_tp_power_return;
 		mdelay(5);
 
 		pr_debug("[TSP] %s: power off\n", __func__);
 	}
-	pr_info("tp power %s, now:%d.\n", on?"on":"off", regulator_is_enabled(vreg_tp_2P8V));
+	pr_info("tp power %s, now:%d.\n", on?"on":"off", regulator_is_enabled(regula));
 
 oppo_tp_power_return:
-	mutex_unlock(&TP_POWER_LOCK);
 	return rc;
  }
 #endif
@@ -1931,20 +2018,24 @@ oppo_tp_power_return:
 #define GPIO_TOUCH_INT	6
 #define GPIO_TP_WAKEUP  (14)
 #define GPIO_TP_ID      (15)
-
-int remote_rmi4_get_irq_gpio(void)   //add by yben
-{
-	return (int)GPIO_TOUCH_INT ;
-}
+#define GPIO_TP_ID_N1  (60)
+#define GPIO_TP_ID2_N1 (59)
 
 static void touch_init_hw(void)
 {
 	gpio_request(GPIO_TOUCH_INT, "TOUCH_INT");
 	gpio_direction_input(GPIO_TOUCH_INT);
 #ifdef CONFIG_TOUCHSCREEN_SYNAPTICS_S3202_I2C_RMI
-	if (get_pcb_version() >= PCB_VERSION_EVT)
+	if (get_pcb_version() >= PCB_VERSION_EVT_N1)
 	{
-		gpio_tlmm_config(GPIO_CFG(GPIO_TP_WAKEUP, 0, GPIO_CFG_INPUT,
+		gpio_tlmm_config(GPIO_CFG(GPIO_TP_ID_N1, 0, GPIO_CFG_INPUT,
+				GPIO_CFG_PULL_UP, GPIO_CFG_2MA), GPIO_CFG_ENABLE);
+		gpio_tlmm_config(GPIO_CFG(GPIO_TP_ID2_N1, 0, GPIO_CFG_INPUT,
+				GPIO_CFG_PULL_UP, GPIO_CFG_2MA), GPIO_CFG_ENABLE);
+	}
+    else
+    {
+        gpio_tlmm_config(GPIO_CFG(GPIO_TP_WAKEUP, 0, GPIO_CFG_INPUT,
 				GPIO_CFG_PULL_UP, GPIO_CFG_2MA), GPIO_CFG_ENABLE);
 		gpio_tlmm_config(GPIO_CFG(GPIO_TP_ID, 0, GPIO_CFG_INPUT,
 				GPIO_CFG_PULL_UP, GPIO_CFG_2MA), GPIO_CFG_ENABLE);
@@ -1954,9 +2045,9 @@ static void touch_init_hw(void)
         gpio_request(GPIO_TOUCH_RST, "TOUCH_RST");
 	    gpio_direction_output(GPIO_TOUCH_RST, 1);
 /* OPPO 2013-08-23 ranfei Add end */
-
-		oppo_touchscreen_power(1);
-	}
+    }
+    
+	oppo_touchscreen_power(1);
 #endif
 }
 
@@ -1983,6 +2074,52 @@ static struct i2c_board_info synaptics_s3202_touch_info[] = {
 #endif
 /* OPPO 2012-07-31 liujun Add end */
 
+//////////////////////////////////////
+//yanghai add 
+#ifdef CONFIG_VENDOR_EDIT
+/* OPPO 2012-07-31 liujun Add begin for define touch screen data */
+
+
+#define GPIO_TOUCHPAD_INT	56
+#define GPIO_TOUCHPAD_RST   57
+
+static void touchpad_init_hw(void)
+{
+    gpio_tlmm_config(GPIO_CFG(GPIO_TOUCHPAD_INT, 0, GPIO_CFG_INPUT,
+				GPIO_CFG_PULL_UP, GPIO_CFG_2MA), GPIO_CFG_ENABLE);
+	gpio_tlmm_config(GPIO_CFG(GPIO_TOUCHPAD_RST, 0, GPIO_CFG_OUTPUT,
+				GPIO_CFG_PULL_UP, GPIO_CFG_2MA), GPIO_CFG_ENABLE);
+}
+
+#ifdef CONFIG_TOUCHSCREEN_SYNAPTICS_S3202_I2C_RMI
+static struct y8c20x66a_i2c_rmi_platform_data synap_y8c20x66a_touch_platform_data[] = {
+	{
+		.power = oppo_touchpad_power,
+		.irqflags = IRQF_TRIGGER_FALLING,
+		.reset_gpio = GPIO_TOUCHPAD_RST,
+	}
+};
+
+
+static struct i2c_board_info synaptics_y8c20x66a_touch_info[] = {
+	{
+#ifdef CYPRESS_CHIP
+		I2C_BOARD_INFO(y8c20x66a_I2C_RMI_NAME, 0x64),   //cypress
+#endif
+#ifdef MICROCHIP_CHIP
+		I2C_BOARD_INFO(y8c20x66a_I2C_RMI_NAME, 0x25),   //microchip
+#endif
+		.irq		= MSM_GPIO_TO_INT(GPIO_TOUCHPAD_INT),
+		.platform_data = synap_y8c20x66a_touch_platform_data,
+	}
+};
+#endif
+
+
+#endif
+
+//yanghai add  end
+///////////////////////////////////
 #define MSM_WCNSS_PHYS	0x03000000
 #define MSM_WCNSS_SIZE	0x280000
 
@@ -2909,6 +3046,13 @@ static struct platform_device *gsbi7_i2c_devices[] __initdata = {
 	&apq8064_device_qup_i2c_gsbi7,
 };
 /* OPPO 2013-02-04 kangjian Add end */
+
+/* OPPO 2013-07-24 sjc Add begin for reason */
+static struct platform_device *gsbi5_i2c_devices[] __initdata = {
+	&apq8064_device_qup_i2c_gsbi5,
+};
+/* OPPO 2013-07-24 sjc Add end */
+
 static struct platform_device *early_common_devices[] __initdata = {
 #ifdef CONFIG_VENDOR_EDIT
 	&ram_console_device,
@@ -3183,9 +3327,16 @@ static struct platform_device *mpq_devices[] __initdata = {
 	&rc_input_loopback_pdev,
 };
 
+
 static struct msm_spi_platform_data apq8064_qup_spi_gsbi5_pdata = {
 	.max_clock_speed = 1100000,
 };
+/* OPPO 2013-07-24 liubin Add for spi gsbi4 start */
+static struct msm_spi_platform_data apq8064_qup_spi_gsbi4_pdata = {
+	.max_clock_speed = 24000000,
+};
+/* OPPO 2013-07-24 liubin Add end */
+
 
 #define KS8851_IRQ_GPIO		43
 
@@ -3205,6 +3356,16 @@ static struct spi_board_info spi_board_info[] __initdata = {
 		.chip_select		= 3,
 		.mode			= SPI_MODE_0,
 	},
+	
+	/* OPPO 2013-07-24 liubin Add for m9mo_spi board info start */
+	{
+		.modalias			= "m9mo_spi",
+		.max_speed_hz		= 10000000,
+		.bus_num			= 0,
+		.chip_select		= 0,
+		.mode				= SPI_MODE_0,
+	},
+	/* OPPO 2013-07-24 liubin Add end */
 };
 
 static struct slim_boardinfo apq8064_slim_devices[] = {
@@ -3220,7 +3381,7 @@ static struct slim_boardinfo apq8064_slim_devices[] = {
 };
 
 static struct msm_i2c_platform_data apq8064_i2c_qup_gsbi1_pdata = {
-	.clk_freq = 100000,
+	.clk_freq = 245000,/*100000,   //changed by yubin, oppo*/
 	.src_clk_rate = 24000000,
 };
 
@@ -3245,6 +3406,14 @@ static struct msm_i2c_platform_data apq8064_i2c_qup_gsbi7_pdata = {
 	.src_clk_rate = 24000000,
 };
 /* OPPO 2013-02-04 kangjian Add end */
+
+/* OPPO 2013-07-24 sjc Add begin for reason */
+static struct msm_i2c_platform_data apq8064_i2c_qup_gsbi5_pdata = {
+	.clk_freq = 100000,
+	.src_clk_rate = 24000000,
+};
+/* OPPO 2013-07-24 sjc Add end */
+
 #define GSBI_DUAL_MODE_CODE 0x60
 #define MSM_GSBI1_PHYS		0x12440000
 static void __init apq8064_i2c_init(void)
@@ -3276,6 +3445,14 @@ static void __init apq8064_i2c_init(void)
 					&apq8064_i2c_qup_gsbi7_pdata;
 	}
 /* OPPO 2013-02-04 kangjian Add end */
+
+/* OPPO 2013-07-24 sjc Add begin for bq27541 I2C */
+	if (get_pcb_version() >= PCB_VERSION_EVT_N1) {
+    		apq8064_device_qup_i2c_gsbi5.dev.platform_data =
+					&apq8064_i2c_qup_gsbi5_pdata;
+	}
+/* OPPO 2013-07-24 sjc Add end */
+
 	mpq8064_device_qup_i2c_gsbi5.dev.platform_data =
 					&mpq8064_i2c_qup_gsbi5_pdata;
 }
@@ -3283,16 +3460,24 @@ static void __init apq8064_i2c_init(void)
 #if defined(CONFIG_KS8851) || defined(CONFIG_KS8851_MODULE)
 static int ethernet_init(void)
 {
+/* OPPO 2013-07-23 ranfei Delete begin for reason */
+#if 0
 	int ret;
 	ret = gpio_request(KS8851_IRQ_GPIO, "ks8851_irq");
 	if (ret) {
 		pr_err("ks8851 gpio_request failed: %d\n", ret);
 		goto fail;
 	}
+#endif
+/* OPPO 2013-07-23 ranfei Delete end */
 
 	return 0;
+/* OPPO 2013-07-23 ranfei Delete begin for reason */
+#if 0
 fail:
 	return ret;
+#endif
+/* OPPO 2013-07-23 ranfei Delete end */
 }
 #else
 static int ethernet_init(void)
@@ -3549,7 +3734,17 @@ static struct platform_device mpq_keypad_device = {
 #define GPIO_KEY_HALLSENSOR (23)
 #define GPIO_KEY_HALLSENSOR_PVT (44)
 /* OPPO 2012-10-29 wangjw Add end */
+/* OPPO 2013-07-23 ranfei Add begin for reason */
+#define GPIO_HALLSENSOR_N1  (15)
+#define GPIO_KEY_MR1        (43)
+#define GPIO_KEY_MR2        (44)
+/* OPPO 2013-07-23 ranfei Add end */
+/*yuyi add begin*/
+#define GPIO_BUTTON_BACK  PM8921_GPIO_PM_TO_SYS(26)
+#define GPIO_BUTTON_HOME  PM8921_GPIO_PM_TO_SYS(27)
+#define GPIO_BUTTON_MENU  PM8921_GPIO_PM_TO_SYS(28)
 
+/*yuyi add end*/
 struct gpio_keys_button vol_keys[] = {
 	{
 		.code              = KEY_VOLUMEDOWN,
@@ -3595,6 +3790,120 @@ static struct platform_device gpio_keys_device ={
 	},
 };
 
+/* OPPO 2013-07-26 ranfei Add begin for reason */
+struct gpio_keys_button vol_keys_n1[] = {
+	{
+		.code              = KEY_VOLUMEDOWN,
+		.gpio              = GPIO_KEY_VOLUME_DOWN,
+		.active_low        = 1,
+		.desc              = "volume_down_key",
+		.type              = EV_KEY,
+		.wakeup            = 1,
+		.debounce_interval = 20,
+		.can_disable       = true,
+	},
+	{
+		.code              = KEY_VOLUMEUP,
+		.gpio              = GPIO_KEY_VOLUME_UP,
+		.active_low        = 0,
+		.desc              = "volume_up_key",
+		.type              = EV_KEY,
+		.wakeup            = 1,
+		.debounce_interval = 20,
+		.can_disable       = true,
+	},
+	{
+		.code              = SW_LID,
+        .gpio              = GPIO_HALLSENSOR_N1,
+		.active_low        = 1,
+		.desc              = "hallsensor_key",
+		.type              = EV_SW,
+		.wakeup            = 1,
+		.debounce_interval = 20,
+		.can_disable       = true,
+	},
+	{
+		.code              = KEY_BACK,
+		.gpio              = GPIO_BUTTON_BACK,
+		.active_low        = 1,
+		.desc              = "button_back",
+		.type              = EV_KEY,
+		.wakeup            = 0,
+		.debounce_interval = 20,
+		.can_disable       = true,
+	},
+	{
+		.code              = KEY_HOME,
+		.gpio              = GPIO_BUTTON_HOME,
+		.active_low        = 1,
+		.desc              = "button_home",
+		.type              = EV_KEY,
+		.wakeup            = 0,
+		.debounce_interval = 20,
+		.can_disable       = true,
+	},
+	{
+		.code              = KEY_MENU ,
+		.gpio              = GPIO_BUTTON_MENU,
+		.active_low        = 1,
+		.desc              = "button_menu",
+		.type              = EV_KEY,
+		.wakeup            = 0,
+		.debounce_interval = 20,
+		.can_disable       = true,
+	},
+};
+
+struct gpio_keys_platform_data gpio_keys_pdata_n1 = {
+	.buttons = vol_keys_n1,
+	.nbuttons = ARRAY_SIZE(vol_keys_n1),
+};
+
+static struct platform_device gpio_keys_device_n1 ={
+	.name = "gpio-keys",
+	.id = -1,
+	.dev = {
+		.platform_data = &gpio_keys_pdata_n1,
+	},
+};
+/* OPPO 2013-07-26 ranfei Add end */
+
+/* OPPO 2013-08-06 liubin Add for camera rotate key start */
+struct gpio_keys_button camera_rotate_keys[] = {
+	{
+		.code              = KEY_F1,
+        .gpio              = GPIO_KEY_MR1,
+		.active_low        = 1,
+		.desc              = "MRsensor_key1",
+		.type              = EV_KEY,
+		.wakeup            = 0,
+		.debounce_interval = 20,
+		.can_disable       = true,
+	},
+    {
+		.code              = KEY_F2,
+        .gpio              = GPIO_KEY_MR2,
+		.active_low        = 1,
+		.desc              = "MRsensor_key2",
+		.type              = EV_KEY,
+		.wakeup            = 1,
+		.debounce_interval = 20,
+		.can_disable       = true,
+	}
+};
+struct gpio_keys_platform_data camera_rotate_keys_pdata = {
+	.buttons = camera_rotate_keys,
+	.nbuttons = ARRAY_SIZE(camera_rotate_keys),
+};
+static struct platform_device camera_rotate_keys_device ={
+	.name = "camera-rotate-keys",
+	.id = -1,
+	.dev = {
+		.platform_data = &camera_rotate_keys_pdata,
+	},
+};
+/* OPPO 2013-07-24 liubin Add end */
+
 static void apq8064_init_gpio_key(void)
 {
 	if (get_pcb_version() < PCB_VERSION_EVT)
@@ -3614,14 +3923,33 @@ static void apq8064_init_gpio_key(void)
 	}
 	if(get_pcb_version() < PCB_VERSION_PVT){
 		vol_keys[2].gpio = GPIO_KEY_HALLSENSOR;
-	}else{
+	} else{
 		vol_keys[2].gpio = GPIO_KEY_HALLSENSOR_PVT;
 	}
 	gpio_tlmm_config(GPIO_CFG(vol_keys[1].gpio, 0, GPIO_CFG_INPUT,
 				GPIO_CFG_PULL_DOWN, GPIO_CFG_8MA), GPIO_CFG_ENABLE);
-      gpio_tlmm_config(GPIO_CFG(vol_keys[2].gpio, 0, GPIO_CFG_INPUT,
+    gpio_tlmm_config(GPIO_CFG(vol_keys[2].gpio, 0, GPIO_CFG_INPUT,
 				GPIO_CFG_PULL_UP, GPIO_CFG_8MA), GPIO_CFG_ENABLE);
-	platform_device_register(&gpio_keys_device);
+
+    if(get_pcb_version() == PCB_VERSION_EVT_N1) {
+        gpio_tlmm_config(GPIO_CFG(GPIO_KEY_VOLUME_DOWN, 0, GPIO_CFG_INPUT,
+				GPIO_CFG_PULL_UP, GPIO_CFG_8MA), GPIO_CFG_ENABLE); 
+        gpio_tlmm_config(GPIO_CFG(GPIO_KEY_VOLUME_UP, 0, GPIO_CFG_INPUT,
+				GPIO_CFG_PULL_DOWN, GPIO_CFG_8MA), GPIO_CFG_ENABLE);
+        gpio_tlmm_config(GPIO_CFG(GPIO_HALLSENSOR_N1, 0, GPIO_CFG_INPUT,
+				GPIO_CFG_PULL_UP, GPIO_CFG_8MA), GPIO_CFG_ENABLE);
+        platform_device_register(&gpio_keys_device_n1);
+
+		/* OPPO 2013-08-06 liubin Add for camera rotate key start */
+		gpio_tlmm_config(GPIO_CFG(GPIO_KEY_MR1, 0, GPIO_CFG_INPUT,
+				GPIO_CFG_PULL_UP, GPIO_CFG_8MA), GPIO_CFG_ENABLE);
+        gpio_tlmm_config(GPIO_CFG(GPIO_KEY_MR2, 0, GPIO_CFG_INPUT,
+				GPIO_CFG_PULL_UP, GPIO_CFG_8MA), GPIO_CFG_ENABLE);
+		platform_device_register(&camera_rotate_keys_device);
+		/* OPPO 2013-08-06 liubin Add end */
+    } else {
+        platform_device_register(&gpio_keys_device);
+    }
 }
 
 #endif /* VENDOR_EDIT */
@@ -3655,6 +3983,25 @@ struct i2c_registry {
 	int                    len;
 };
 
+#ifdef CONFIG_VENDOR_EDIT
+/* OPPO 2013-07-26 ranfei Add begin for reason */
+static struct regulator *ldo121 = NULL;
+
+static void sensor_i2c_power_init(void) {
+    ldo121 = regulator_get(NULL, "8921_l21");
+	if (IS_ERR(ldo121)){
+		pr_err("%s: VREG ldo121 get failed\n", __func__);
+		ldo121 = NULL;
+	}
+	if (regulator_set_voltage(ldo121, 1800000, 1800000)) {
+		pr_err("%s: VREG ldo121 set voltage failed\n",	__func__);
+	}
+	if (regulator_enable(ldo121)) {
+		pr_err("%s: VREG ldo121 enable failed\n", __func__);
+	}	
+}
+/* OPPO 2013-07-26 ranfei Add end */
+#endif
 
 #ifdef CONFIG_VENDOR_EDIT
 /* OPPO 2013-02-20 yuyi Add begin for nfc */
@@ -3663,7 +4010,10 @@ struct i2c_registry {
 #define APQ_NFC_VEN_GPIO 53  //NFC_ENABLE
 #define APQ_NFC_FIRM_GPIO 54  //NFC_UPDATE
 #define APQ_NFC_IRQ_GPIO 55   //NFC_IRQ
-
+/*OPPO yuyi add for N1*/
+#define APQ_NFC_VEN_GPIO_N1  37 //NFC_ENABLE
+#define APQ_NFC_FIRM_GPIO_N1 31  //NFC_UPDATE
+/*yuyi add end*/
  static struct regulator *ldol23;
 
  struct pn544_i2c_platform_data nfc_pdata  = {
@@ -3683,10 +4033,19 @@ struct i2c_registry {
 #define PN544_VEN	GPIO_CFG(APQ_NFC_VEN_GPIO, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA)
 #define PN544_FIRM	GPIO_CFG(APQ_NFC_FIRM_GPIO, 0, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA)
 #define PN544_IRQ	GPIO_CFG(APQ_NFC_IRQ_GPIO, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA)
- 
+
+#define PN544_VEN_N1	GPIO_CFG(APQ_NFC_VEN_GPIO_N1, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA)
+#define PN544_FIRM_N1	GPIO_CFG(APQ_NFC_FIRM_GPIO_N1, 0, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA)
+
  static void pn544_power_init(void)
  {
 	 int ret = 0  ;
+
+	 if( get_pcb_version() == PCB_VERSION_EVT_N1 ) 
+	 {
+	 	nfc_pdata.ven_gpio = APQ_NFC_VEN_GPIO_N1;
+		nfc_pdata.firm_gpio = APQ_NFC_FIRM_GPIO_N1;
+	 }
 	 
     //l23
 	ldol23 = regulator_get(NULL, "8921_l23");
@@ -3695,17 +4054,14 @@ struct i2c_registry {
 		ldol23 = NULL;
 		goto ldo123_get_failed;
 	}
-//	printk("8921_l23 power on1 baord yuyi+++++++++++++++++++++++++++++++++++++++++\n");
 	if (regulator_set_voltage(ldol23, 1800000, 1800000)) {
 		pr_err("%s: VREG ldol23 set voltage failed\n",  __func__);
 		goto ldo123_get_failed;
 	}
-//	printk("8921_l23 power on2 baord yuyi+++++++++++++++++++++++++++++++++++++++++\n");
 	if (regulator_enable(ldol23)) {
 		pr_err("%s: VREG ldol23 enable failed\n", __func__);
 		goto ldo123_get_failed;
 	}
-//	printk("8921_l23 power on3 baord yuyi+++++++++++++++++++++++++++++++++++++++++\n");
 
 	 //irq
 	 ret = gpio_tlmm_config(PN544_IRQ, GPIO_CFG_ENABLE);
@@ -3713,26 +4069,48 @@ struct i2c_registry {
 		 printk(KERN_ERR "%s:gpio_tlmm_config(%#x)=%d\n",
 				 __func__, PN544_IRQ, ret);
 	 }
- //    printk("irp power on3 baord yuyi+++++++++++++++++++++++++++++++++++++++++\n");
-	 //ven 
-	 ret = gpio_tlmm_config(PN544_VEN, GPIO_CFG_ENABLE);
-	 if (ret) {
-		 printk(KERN_ERR "%s:gpio_tlmm_config(%#x)=%d\n",
-			 __func__, PN544_VEN, ret);
-	 }
+
+	 if(get_pcb_version() == PCB_VERSION_EVT_N1) 
+	{
+	 	 ret = gpio_tlmm_config(PN544_VEN_N1, GPIO_CFG_ENABLE);
+	 	if (ret) {
+			 printk(KERN_ERR "%s:gpio_tlmm_config(%#x)=%d\n",
+				 __func__, PN544_VEN_N1, ret);
+	 	}	
 	 
-	 gpio_set_value(APQ_NFC_VEN_GPIO, 1);
-	 msleep(100);
-//	 printk("ven power on3 baord yuyi+++++++++++++++++++++++++++++++++++++++++\n");
+	 	gpio_set_value(APQ_NFC_VEN_GPIO_N1, 1);
+		 msleep(100);
   //firmware gpio
-	  ret = gpio_tlmm_config(PN544_FIRM, GPIO_CFG_ENABLE);
-	  if (ret) {
-		  printk(KERN_ERR "%s:gpio_tlmm_config(%#x)=%d\n",
-			  __func__, PN544_FIRM, ret);
-	  }
-	  gpio_set_value(APQ_NFC_FIRM_GPIO, 0);
+	  	ret = gpio_tlmm_config(PN544_FIRM_N1, GPIO_CFG_ENABLE);
+	 	 if (ret) {
+			  printk(KERN_ERR "%s:gpio_tlmm_config(%#x)=%d\n",
+				  __func__, PN544_FIRM_N1, ret);
+	 	 }
+	 	 gpio_set_value(APQ_NFC_FIRM_GPIO_N1, 0);
+	} else
+	{
+	 //ven 
+	 	ret = gpio_tlmm_config(PN544_VEN, GPIO_CFG_ENABLE);
+		 if (ret) {
+			 printk(KERN_ERR "%s:gpio_tlmm_config(%#x)=%d\n",
+				 __func__, PN544_VEN, ret);
+		 }
+	 
+		 gpio_set_value(APQ_NFC_VEN_GPIO, 1);
+		 msleep(100);
+  //firmware gpio
+	 	 ret = gpio_tlmm_config(PN544_FIRM, GPIO_CFG_ENABLE);
+		  if (ret) {
+			  printk(KERN_ERR "%s:gpio_tlmm_config(%#x)=%d\n",
+				  __func__, PN544_FIRM, ret);
+	 	 }
+	 	 gpio_set_value(APQ_NFC_FIRM_GPIO, 0);
+	}
 	  
 	  printk(KERN_ERR "%s:liuhd for nfc gpio---\n",__func__);
+	  //yuyi add 
+	  printk("nfc gpio , gpios=%d %d %d\n", 
+				nfc_pdata.irq_gpio, nfc_pdata.ven_gpio, nfc_pdata.firm_gpio);
 
  ldo123_get_failed:
 	 regulator_disable(ldol23);
@@ -3780,7 +4158,17 @@ static struct i2c_board_info lcd_1080p_info[] = {
 	{
 		I2C_BOARD_INFO("lm3528", 0x36),
 	},
+	
 };
+
+/* OPPO 2013-07-31 Neal Add begin bkl*/
+static struct i2c_board_info lcd_1080p_info_N1[] = {
+
+	{
+		I2C_BOARD_INFO("lm3630", 0x38),
+	},
+};
+/* OPPO 2013-07-31 Neal Add begin bkl*/
 
 static struct i2c_registry lcd_1080p_i2c_devices[] __initdata = {
  {
@@ -3790,11 +4178,30 @@ static struct i2c_registry lcd_1080p_i2c_devices[] __initdata = {
 	 ARRAY_SIZE(lcd_1080p_info),
  },
 };
+/* OPPO 2013-07-31 Neal Add begin bkl*/
+static struct i2c_registry lcd_1080p_i2c_devices_N1[] __initdata = {
+ {
+	 I2C_SURF | I2C_LIQUID | I2C_FFA |I2C_MPQ_CDP |I2C_RUMI |I2C_MPQ_HRD | I2C_MPQ_DTV,
+	 APQ_8064_GSBI3_QUP_I2C_BUS_ID,
+	 lcd_1080p_info_N1,
+	 ARRAY_SIZE(lcd_1080p_info_N1),
+ },
+};
+/* OPPO 2013-07-31 Neal Add end*/
 
 static void register_lcd_1080p_i2c_devices(void) {
 	 printk("----%s: register lcd device is 1080p --\n", __func__);
-	 i2c_register_board_info(lcd_1080p_i2c_devices[0].bus,
-		 lcd_1080p_i2c_devices[0].info, lcd_1080p_i2c_devices[0].len);
+/* OPPO 2013-07-31 Neal Add begin bkl*/
+	 if(get_pcb_version() == PCB_VERSION_EVT_N1){
+			i2c_register_board_info(lcd_1080p_i2c_devices_N1[0].bus,
+		 	lcd_1080p_i2c_devices_N1[0].info, lcd_1080p_i2c_devices_N1[0].len);
+	 }
+	 else{
+	 	
+	 		i2c_register_board_info(lcd_1080p_i2c_devices[0].bus,
+		 	lcd_1080p_i2c_devices[0].info, lcd_1080p_i2c_devices[0].len);
+	 }
+/* OPPO 2013-07-31 Neal Add begin bkl*/
 }
 //OPPO 2012-10-23 huyu add for lcd compatible
 static struct i2c_registry apq8064_i2c_devices[] __initdata = {
@@ -3869,6 +4276,94 @@ static struct i2c_registry apq8064_i2c_devices[] __initdata = {
 /* OPPO 2013-02-21 yuyi Add end */
 };
 
+static struct i2c_registry apq8064_i2c_devices_n1[] __initdata = {
+/* OPPO 2013-07-08 sjc Add begin for reason */
+	{
+		I2C_LIQUID,
+		APQ_8064_GSBI1_QUP_I2C_BUS_ID,
+		smb349_charger_i2c_info,
+		ARRAY_SIZE(smb349_charger_i2c_info),
+	},
+	{
+		I2C_SURF | I2C_FFA | I2C_LIQUID | I2C_RUMI,
+		APQ_8064_GSBI1_QUP_I2C_BUS_ID,
+		smb358_charger_i2c_info,
+		ARRAY_SIZE(smb358_charger_i2c_info),
+	},
+	//sjc add 2013-07-23
+	{
+		I2C_SURF | I2C_FFA | I2C_LIQUID | I2C_RUMI,
+		APQ_8064_GSBI5_QUP_I2C_BUS_ID,
+		bq27541_charger_i2c_info,
+		ARRAY_SIZE(bq27541_charger_i2c_info),
+	},
+/* OPPO 2013-07-08 sjc Add end */
+
+/* OPPO 2012-09-08 liujun Delete begin for disable original touchscreen define */
+#ifndef CONFIG_VENDOR_EDIT
+	{
+		I2C_SURF | I2C_LIQUID,
+		APQ_8064_GSBI3_QUP_I2C_BUS_ID,
+		mxt_device_info,
+		ARRAY_SIZE(mxt_device_info),
+	},
+	{
+		I2C_FFA,
+		APQ_8064_GSBI3_QUP_I2C_BUS_ID,
+		cyttsp_info,
+		ARRAY_SIZE(cyttsp_info),
+	},
+#else
+/* OPPO 2012-09-08 liujun Delete end */
+/* OPPO 2012-07-31 liujun Add begin for define touchscreen data */
+#ifdef CONFIG_TOUCHSCREEN_SYNAPTICS_S3202_I2C_RMI
+	{
+		I2C_SURF | I2C_LIQUID | I2C_FFA,
+		APQ_8064_GSBI3_QUP_I2C_BUS_ID,
+		synaptics_s3202_touch_info,
+		ARRAY_SIZE(synaptics_s3202_touch_info),
+	},
+#endif
+#endif
+#ifdef CONFIG_VENDOR_EDIT
+//yanghai add for backgroud touch 
+	 {
+		 I2C_SURF | I2C_LIQUID | I2C_FFA,
+		 APQ_8064_GSBI1_QUP_I2C_BUS_ID,
+		 synaptics_y8c20x66a_touch_info,
+		 ARRAY_SIZE(synaptics_y8c20x66a_touch_info),
+	 },
+//yanghai add end
+#endif
+
+/* OPPO 2012-07-31 liujun Add end */
+	{
+		I2C_FFA | I2C_LIQUID,
+		APQ_8064_GSBI1_QUP_I2C_BUS_ID,
+		isa1200_board_info,
+		ARRAY_SIZE(isa1200_board_info),
+	},
+	{
+		I2C_MPQ_CDP,
+		APQ_8064_GSBI5_QUP_I2C_BUS_ID,
+		cs8427_device_info,
+		ARRAY_SIZE(cs8427_device_info),
+	},
+#ifdef CONFIG_VENDOR_EDIT
+/* OPPO 2013-02-20 yuyi Add begin for reason */
+
+
+	{
+		I2C_SURF | I2C_FFA | I2C_LIQUID | I2C_RUMI,
+		APQ_8064_GSBI1_QUP_I2C_BUS_ID,
+		nfc_board_info,
+		ARRAY_SIZE(nfc_board_info),
+	},
+
+
+/* OPPO 2013-02-20 yuyi Add end */
+#endif
+};
 #define SX150X_EXP1_INT_N	PM8921_MPP_IRQ(PM8921_IRQ_BASE, 9)
 #define SX150X_EXP2_INT_N	MSM_GPIO_TO_INT(81)
 
@@ -3955,6 +4450,14 @@ static void __init register_i2c_devices(void)
 		apq8064_camera_board_info.board_info,
 		apq8064_camera_board_info.num_i2c_board_info,
 	};
+	/* OPPO 2013-07-24 liubin Add for m9mo on gsbi7 start */
+	struct i2c_registry apq8064_camera_i2c_devices_N1 = {
+		I2C_SURF | I2C_FFA | I2C_LIQUID | I2C_RUMI,
+		APQ_8064_GSBI7_QUP_I2C_BUS_ID,
+		apq8064_camera_board_info.board_info,
+		apq8064_camera_board_info.num_i2c_board_info,
+	};
+	/* OPPO 2013-07-24 liubin Add end */
 /* OPPO 2013-02-04 kangjian added begin for s5k6a3yx on GSBI7(DVT) */
 	struct i2c_registry apq8064_subcamera_i2c_devices = {
 		I2C_SURF | I2C_FFA | I2C_LIQUID | I2C_RUMI,
@@ -3991,14 +4494,30 @@ static void __init register_i2c_devices(void)
 	touch_init_hw();
 /* OPPO 2012-07-31 liujun Add end */
 #endif
-
+//yanghai add
+#ifdef CONFIG_VENDOR_EDIT
+/* OPPO 2012-07-31 liujun Add begin for init tp hw */
+	touchpad_init_hw();
+/* OPPO 2012-07-31 liujun Add end */
+#endif
+//yanghai add end
 #ifdef CONFIG_VENDOR_EDIT
 /* OPPO 2013-02-20 yuyi Add begin for reason */
 	pn544_power_init();
 /* OPPO 2013-02-20 yuyi Add end */
 #endif
 
+#ifdef CONFIG_VENDOR_EDIT
+/* OPPO 2013-07-26 ranfei Add begin for reason */
+    if((get_pcb_version() >= PCB_VERSION_EVT_N1) && (get_pcb_version() <= PCB_VERSION_EVT_N1F)) {
+        sensor_i2c_power_init();
+    }
+/* OPPO 2013-07-26 ranfei Add end */
+#endif
+
 //OPPO 213-02-21 yuyi add begin for breathe led
+if( get_pcb_version() < PCB_VERSION_EVT_N1)
+{
 #ifdef CONFIG_VENDOR_EDIT
 	SN3193_power_init();
 #endif
@@ -4011,11 +4530,39 @@ static void __init register_i2c_devices(void)
 						apq8064_i2c_devices[i].info,
 						apq8064_i2c_devices[i].len);
 	}
+} else {
+	for (i = 0; i < ARRAY_SIZE(apq8064_i2c_devices_n1); ++i) {
+		if (apq8064_i2c_devices_n1[i].machs & mach_mask)
+			i2c_register_board_info(apq8064_i2c_devices_n1[i].bus,
+						apq8064_i2c_devices_n1[i].info,
+						apq8064_i2c_devices_n1[i].len);
+	}
+}
 #ifdef CONFIG_MSM_CAMERA
+	/* OPPO 2013-07-24 liubin Modify for N1 camera i2c on gsbi7 start */
+	#if 0
 	if (apq8064_camera_i2c_devices.machs & mach_mask)
-		i2c_register_board_info(apq8064_camera_i2c_devices.bus,
-			apq8064_camera_i2c_devices.info,
-			apq8064_camera_i2c_devices.len);
+			i2c_register_board_info(apq8064_camera_i2c_devices.bus,
+				apq8064_camera_i2c_devices.info,
+				apq8064_camera_i2c_devices.len);
+	#else
+	if (get_pcb_version() == PCB_VERSION_EVT_N1)
+	{
+		if (apq8064_camera_i2c_devices_N1.machs & mach_mask)
+			i2c_register_board_info(apq8064_camera_i2c_devices_N1.bus,
+				apq8064_camera_i2c_devices_N1.info,
+				apq8064_camera_i2c_devices_N1.len);
+	}
+	else
+	{
+		if (apq8064_camera_i2c_devices.machs & mach_mask)
+			i2c_register_board_info(apq8064_camera_i2c_devices.bus,
+				apq8064_camera_i2c_devices.info,
+				apq8064_camera_i2c_devices.len);
+	}
+	#endif
+	/* OPPO 2013-07-24 liubin Modify end */
+	
 /* OPPO 2013-02-04 kangjian added begin for s5k6a3yx */
     if (get_pcb_version() >= PCB_VERSION_DVT){ //DVT
     	if (apq8064_subcamera_i2c_devices.machs & mach_mask)
@@ -4162,9 +4709,25 @@ static void __init apq8064_common_init(void)
 	register_lcd_1080p_i2c_devices();			//added by huyu
 //OPPO 2012-10-23 huyu add for lcd compatible
 
-
+	/* OPPO 2013-07-24 liubin Modify for spi device register and init default m9mo inter gpio start*/
+	#if 0
 	apq8064_device_qup_spi_gsbi5.dev.platform_data =
 						&apq8064_qup_spi_gsbi5_pdata;
+	#else
+	if (get_pcb_version() == PCB_VERSION_EVT_N1)
+	{
+	    msm8064_device_qup_spi_gsbi4.dev.platform_data = &apq8064_qup_spi_gsbi4_pdata;
+		platform_device_register(&msm8064_device_qup_spi_gsbi4);
+		gpio_request(26, "m9mo_irq_gpio");
+		gpio_direction_input(26);
+	}
+	else
+	{
+		apq8064_device_qup_spi_gsbi5.dev.platform_data = &apq8064_qup_spi_gsbi5_pdata;
+	}
+	#endif
+	/* OPPO 2013-07-24 liubin Modify end */
+	
 	apq8064_init_pmic();
 	if (machine_is_apq8064_liquid())
 		msm_otg_pdata.mhl_enable = true;
@@ -4202,14 +4765,33 @@ static void __init apq8064_common_init(void)
 		}
 
 		/* Add GSBI4 I2C Device for non-fusion3 platform */
+		/* OPPO 2013-07-24 liubin Modify for gsbi4 use for spi start */
+		#if 0
 		if (socinfo_get_platform_subtype() !=
 					PLATFORM_SUBTYPE_SGLTE2) {
 			platform_device_register(&apq8064_device_qup_i2c_gsbi4);
 		}
-
+		#else
+		if (get_pcb_version() != PCB_VERSION_EVT_N1)
+		{
+			if (socinfo_get_platform_subtype() !=
+						PLATFORM_SUBTYPE_SGLTE2) {
+				platform_device_register(&apq8064_device_qup_i2c_gsbi4);
+			}
+		}
+		#endif
+		/* OPPO 2013-07-24 liubin Modify end */
 	}
 #endif
 /* OPPO 2013-02-04 kangjian modified end */
+
+/* OPPO 2013-07-24 sjc add begin for bq27541 I2C */
+	if (get_pcb_version() >= PCB_VERSION_EVT_N1) {
+		platform_add_devices(gsbi5_i2c_devices,
+			ARRAY_SIZE(gsbi5_i2c_devices));
+	}
+/* OPPO 2013-07-24 sjc add end */
+
 	msm_hsic_pdata.swfi_latency =
 		msm_rpmrs_levels[0].latency_us;
 	if (machine_is_apq8064_mtp()) {

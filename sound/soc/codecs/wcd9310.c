@@ -36,6 +36,9 @@
 #include <linux/irq.h>
 #include <linux/suspend.h>
 #include <linux/wakelock.h>
+
+#include <linux/pcb_version.h>
+
 /*OPPO 2012-07-27 zhzhyon Add begin for headset detect */
 #ifdef CONFIG_VENDOR_EDIT
 #include <linux/switch.h>
@@ -5935,6 +5938,13 @@ static void update_headset_state(struct tabla_priv*  tabla)
 }
 #endif
 /*OPPO 2012-07-27 zhzhyon Add end*/
+
+static bool tabla_hs_gpio_level_remove(struct tabla_priv *tabla)
+{
+	return (gpio_get_value_cansleep(tabla->mbhc_cfg.gpio) !=
+		tabla->mbhc_cfg.gpio_level_insert);
+}
+
 /* called under codec_resource_lock acquisition */
 static void tabla_codec_report_plug(struct snd_soc_codec *codec, int insertion,
 				    enum snd_jack_types jack_type)
@@ -5943,6 +5953,19 @@ static void tabla_codec_report_plug(struct snd_soc_codec *codec, int insertion,
 	pr_debug("%s: enter insertion %d hph_status %x\n",
 		 __func__, insertion, tabla->hph_status);
 	if (!insertion) {
+		/*OPPO 2013-09-02 zhzhyon Add for reason*/
+		if(get_pcb_version() == PCB_VERSION_EVT3_N1T ||
+			get_pcb_version() == PCB_VERSION_PVT3_TD ||
+			get_pcb_version() == PCB_VERSION_EVT_N1)
+		{
+			msleep(50);
+			if(!tabla_hs_gpio_level_remove(tabla))
+			{
+				return;
+			}
+
+		}
+		/*OPPO 2013-09-02 zhzhyon Add end*/
 		/* Report removal */
 		tabla->hph_status &= ~jack_type;
 		if (tabla->mbhc_cfg.headset_jack) {
@@ -6485,15 +6508,11 @@ static void tabla_mbhc_calc_rel_thres(struct snd_soc_codec *codec, s16 mv)
 	tabla->mbhc_data.v_b1_huc = tabla_codec_v_sta_dce(codec, DCE, deltamv);
 }
 
-/* OPPO 2013-06-07 huanggd Delete begin for American headset */	
-#if 0
 static void tabla_mbhc_set_rel_thres(struct snd_soc_codec *codec, s16 mv)
 {
 	tabla_mbhc_calc_rel_thres(codec, mv);
 	tabla_codec_calibrate_rel(codec);
 }
-#endif
-/* OPPO 2013-06-07 huanggd Delete end */	
 
 static s16 tabla_mbhc_highest_btn_mv(struct snd_soc_codec *codec)
 {
@@ -6849,9 +6868,7 @@ static irqreturn_t tabla_dce_handler(int irq, void *data)
 			goto done;
 		}
 		/* narrow down release threshold */
-/* OPPO 2013-06-07 huanggd Delete begin for American headset */		
-		//tabla_mbhc_set_rel_thres(codec, btn_high[btn]);
-/* OPPO 2013-06-07 huanggd Delete end */			
+		tabla_mbhc_set_rel_thres(codec, btn_high[btn]);
 		mask = tabla_get_button_mask(btn);
 		priv->buttons_pressed |= mask;
 		wcd9xxx_lock_sleep(core);
@@ -7240,11 +7257,6 @@ static void tabla_cancel_hs_detect_plug(struct tabla_priv *tabla,
 	TABLA_ACQUIRE_LOCK(tabla->codec_resource_lock);
 }
 
-static bool tabla_hs_gpio_level_remove(struct tabla_priv *tabla)
-{
-	return (gpio_get_value_cansleep(tabla->mbhc_cfg.gpio) !=
-		tabla->mbhc_cfg.gpio_level_insert);
-}
 
 /* called under codec_resource_lock acquisition */
 static void tabla_codec_hphr_gnd_switch(struct snd_soc_codec *codec, bool on)
@@ -7602,6 +7614,10 @@ static void tabla_hs_correct_gpio_plug(struct work_struct *work)
 	struct tabla_priv *tabla;
 	struct snd_soc_codec *codec;
 	int retry = 0, pt_gnd_mic_swap_cnt = 0;
+	/*OPPO 2013-09-02 zhzhyon Add for reason*/
+	int pt_headset_cnt = 0;
+	int headp_count = 0;
+	/*OPPO 2013-09-02 zhzhyon Add end*/
 	bool correction = false;
 	enum tabla_mbhc_plug_type plug_type = PLUG_TYPE_INVALID;
 	unsigned long timeout;
@@ -7662,7 +7678,32 @@ static void tabla_hs_correct_gpio_plug(struct work_struct *work)
 			} else if (tabla->current_plug == PLUG_TYPE_NONE)
 				tabla_codec_report_plug(codec, 1,
 							SND_JACK_HEADPHONE);
-		} else {
+			/*OPPO 2013-09-02 zhzhyon Add for reason*/
+			if(get_pcb_version() == PCB_VERSION_EVT3_N1T ||
+				get_pcb_version() == PCB_VERSION_PVT3_TD ||
+				get_pcb_version() == PCB_VERSION_EVT_N1)
+			{
+				headp_count++;
+				if(headp_count == 2)
+				{
+					break;
+				}
+
+			}				
+			/*OPPO 2013-09-02 zhzhyon Add end*/
+		}
+		/*OPPO 2013-09-02 zhzhyon Add for reason*/
+		else if(plug_type == PLUG_TYPE_HIGH_HPH)
+		{
+			 if(get_pcb_version() == PCB_VERSION_EVT3_N1T ||
+				get_pcb_version() == PCB_VERSION_PVT3_TD || 
+				get_pcb_version() == PCB_VERSION_EVT_N1)
+			 {			
+				continue;
+			 }
+		}
+		/*OPPO 2013-09-02 zhzhyon Add end*/
+		else {
 			if (plug_type == PLUG_TYPE_GND_MIC_SWAP) {
 				pt_gnd_mic_swap_cnt++;
 				if (pt_gnd_mic_swap_cnt <
@@ -7678,8 +7719,12 @@ static void tabla_hs_correct_gpio_plug(struct work_struct *work)
 					if (tabla->mbhc_cfg.swap_gnd_mic(codec))
 						continue;
 				}
-			} else
+			} 
+			else
+			{
+				pt_headset_cnt = pt_headset_cnt + 1;
 				pt_gnd_mic_swap_cnt = 0;
+			}
 
 			TABLA_ACQUIRE_LOCK(tabla->codec_resource_lock);
 			/* Turn off override */
@@ -7691,7 +7736,19 @@ static void tabla_hs_correct_gpio_plug(struct work_struct *work)
 			pr_debug("Attempt %d found correct plug %d\n", retry,
 				 plug_type);
 			correction = true;
-			break;
+			/*OPPO 2013-09-02 zhzhyon Modify for reason*/
+			 if(get_pcb_version() == PCB_VERSION_EVT3_N1T ||
+				get_pcb_version() == PCB_VERSION_PVT3_TD ||
+				get_pcb_version() == PCB_VERSION_EVT_N1)
+			 {
+				if((pt_headset_cnt == 2) || (pt_gnd_mic_swap_cnt == 2))
+					break;
+			 }
+			 else
+			 {
+			 	break;
+			 }
+			/*OPPO 2013-09-02 zhzhyon Modify end*/
 		}
 	}
 
@@ -7719,13 +7776,71 @@ static void tabla_hs_correct_gpio_plug(struct work_struct *work)
 	wcd9xxx_unlock_sleep(tabla->codec->control_data);
 }
 
+/*2013-09-02 zhzhyon Add for 13017-1 and 13005 EVT headset detect*/
+/* called under codec_resource_lock acquisition */
+#define DET_NUM_ADC 4
+static void tabla_codec_decide_gpio_plug_modify(struct snd_soc_codec *codec)
+{
+	enum tabla_mbhc_plug_type plug_type[DET_NUM_ADC];
+	struct tabla_priv *tabla = snd_soc_codec_get_drvdata(codec);
+	int i = 0;
+
+	printk("%s: enter\n", __func__);
+
+	tabla_turn_onoff_override(codec, true);
+
+
+	for(i = 0;i < DET_NUM_ADC;i++)
+	{
+		
+		plug_type[i] = tabla_codec_get_plug_type(codec, true);
+		if(i > 0)
+		{
+			if((plug_type[i] == plug_type[i-1]) )
+			{
+				if(plug_type[i] == PLUG_TYPE_HEADSET ||
+					plug_type[i] == PLUG_TYPE_HEADPHONE)
+				break;
+			}
+		}
+	}
+
+	if(i == DET_NUM_ADC) 
+	{
+		i = i -1;
+	}
+	
+	tabla_turn_onoff_override(codec, false);
+
+	if (tabla_hs_gpio_level_remove(tabla)) 
+	{
+		printk("%s: GPIO value is low when determining plug\n",
+			 __func__);
+		return;
+	}
+	if(plug_type[i] == PLUG_TYPE_HIGH_HPH)
+	{
+		tabla_schedule_hs_detect_plug(tabla,
+					&tabla->hs_correct_plug_work);
+	}
+	else
+	{
+
+		tabla_find_plug_and_report(codec, plug_type[i]);
+
+	}
+
+	pr_debug("%s: leave\n", __func__);
+}
+/*2013-09-02 zhzhyon Add end*/
+
 /* called under codec_resource_lock acquisition */
 static void tabla_codec_decide_gpio_plug(struct snd_soc_codec *codec)
 {
 	enum tabla_mbhc_plug_type plug_type;
 	struct tabla_priv *tabla = snd_soc_codec_get_drvdata(codec);
 
-	pr_debug("%s: enter\n", __func__);
+	printk("%s: enter\n", __func__);
 
 	tabla_turn_onoff_override(codec, true);
 	/*OPPO 2012-07-27 zhzhyon Add for headset detect*/
@@ -7772,7 +7887,6 @@ static void tabla_codec_decide_gpio_plug(struct snd_soc_codec *codec)
 	}
 	pr_debug("%s: leave\n", __func__);
 }
-
 /* called under codec_resource_lock acquisition */
 static void tabla_codec_detect_plug_type(struct snd_soc_codec *codec)
 {
@@ -7806,7 +7920,24 @@ static void tabla_codec_detect_plug_type(struct snd_soc_codec *codec)
 			pr_debug("%s: GPIO value is low when determining "
 				 "plug\n", __func__);
 		else
-			tabla_codec_decide_gpio_plug(codec);
+		{
+			/*2013-09-02 zhzhyon Modify for 13017-1 and N1 EVT3 headset detect*/
+			if(get_pcb_version() == PCB_VERSION_EVT3_N1T ||
+				get_pcb_version() == PCB_VERSION_EVT_N1)
+			{
+				tabla_codec_decide_gpio_plug_modify(codec);
+			}
+			else if(get_pcb_version() == PCB_VERSION_PVT3_TD)
+			{
+				tabla_codec_decide_gpio_plug_modify(codec);
+			}
+			else
+			{
+			
+				tabla_codec_decide_gpio_plug(codec);
+			}
+			/*OPPO 2013-09-02 zhzhyon Modify end*/
+		}
 		pr_debug("%s: leave\n", __func__);
 		return;
 	}
@@ -8271,9 +8402,7 @@ static void tabla_hs_gpio_handler(struct snd_soc_codec *codec,bool irq_detect)
 	#ifdef CONFIG_VENDOR_EDIT
 	if(tabla->hs_on == insert)
 	{
-/* OPPO 2013-08-09 huanggd Modify begin for less print in system sleep/wakeup, may reduce system power*/	
-		//printk(KERN_INFO"headset detect handle don't response:%d\n",tabla->hs_on);
-/* OPPO 2013-08-09 huanggd Modify end*/		
+		printk(KERN_INFO"headset detect handle don't response:%d\n",tabla->hs_on);
 		if((tabla->hs_on == 0)/* && l15_users*/)
 		{
 			/*OPPO 2012-12-28 zhzhyon Add for reason*/

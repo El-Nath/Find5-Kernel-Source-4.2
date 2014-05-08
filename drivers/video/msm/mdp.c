@@ -2355,11 +2355,25 @@ static int mdp_fps_level_change(struct platform_device *pdev, u32 fps_level)
 	ret = panel_next_fps_level_change(pdev, fps_level);
 	return ret;
 }
+/* OPPO 2013-10-05 gousj Add begin for sharp panel flicker */
+#ifdef CONFIG_VENDOR_EDIT
+extern int mipi_orise_display_off(struct platform_device *pdev);
+extern int mipi_orise_sleep_in(struct platform_device *pdev);
+#endif //CONFIG_VENDOR_EDIT
+/* OPPO 2013-10-05 gousj Add end */
 static int mdp_off(struct platform_device *pdev)
 {
 	int ret = 0;
 	struct msm_fb_data_type *mfd = platform_get_drvdata(pdev);
 
+/* OPPO 2013-10-05 gousj Add begin for sharp panel flicker */
+#ifdef CONFIG_VENDOR_EDIT
+	mipi_orise_display_off(pdev);
+	mdelay(20);
+	mipi_orise_sleep_in(pdev);
+	mdelay(80);
+#endif //CONFIG_VENDOR_EDIT
+/* OPPO 2013-10-05 gousj Add end */
 	pr_debug("%s:+\n", __func__);
 	mdp_histogram_ctrl_all(FALSE);
 	atomic_set(&vsync_cntrl.suspend, 1);

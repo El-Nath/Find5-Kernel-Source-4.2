@@ -1007,13 +1007,6 @@ config FB_MSM_MIPI_BACKLIGHT_LM3528
 	depends on I2C
 	---help---
 	  Support for panel backlight
-
-config FB_MSM_MIPI_BACKLIGHT_LM3630
-	bool "lcd backlight lm36308 driver"
-	depends on I2C
-	default y
-	---help---
-	  Support for panel backlight
 	  
 if FB_MSM_MDSS
 	source "drivers/video/msm/mdss/Kconfig"

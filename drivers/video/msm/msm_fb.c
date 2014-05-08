@@ -45,6 +45,7 @@
 #include <linux/sync.h>
 #include <linux/sw_sync.h>
 #include <linux/file.h>
+#include <linux/pcb_version.h>
 
 #define MSM_FB_C
 #include "msm_fb.h"
@@ -52,6 +53,8 @@
 #include "tvenc.h"
 #include "mdp.h"
 #include "mdp4.h"
+extern int get_pcb_version(void);
+
 
 #ifdef CONFIG_FB_MSM_TRIPLE_BUFFER
 #define MSM_FB_NUM	3
@@ -340,12 +343,21 @@ static void msm_fb_set_bl_brightness(struct led_classdev *led_cdev,
 			MAX_BACKLIGHT_BRIGHTNESS - 1) /
 			(MAX_BACKLIGHT_BRIGHTNESS - 1) / 2;
 #else
-		bl_lvl = get_bright_level(value);
+        //Neal
+        if(get_pcb_version() >= PCB_VERSION_EVT_N1)
+        {
+        	bl_lvl = value; 
+        }
+        else
+        {
+            bl_lvl = get_bright_level(value);
+        }
 #endif
 /* OPPO 2013-03-22 zhengzk Add end */
 
         down(&mfd->sem);
 	msm_fb_set_backlight(mfd, bl_lvl);
+	pr_debug("%s Neal msm_fb set back light = %d",__func__,bl_lvl);
 	up(&mfd->sem);
 }
 
@@ -720,9 +732,16 @@ static int msm_fb_suspend(struct platform_device *pdev, pm_message_t state)
 #define msm_fb_suspend NULL
 #endif
 
+static void memset32_io(u32 __iomem *_ptr, u32 val, size_t count)
+{
+    count >>= 2;
+    while (count--)
+        writel(val, _ptr++);
+}
 static int msm_fb_suspend_sub(struct msm_fb_data_type *mfd)
 {
 	int ret = 0;
+	struct fb_info *fbi = mfd->fbi;
 
 	if ((!mfd) || (mfd->key != MFD_KEY))
 		return 0;
@@ -745,7 +764,17 @@ static int msm_fb_suspend_sub(struct msm_fb_data_type *mfd)
 		mfd->suspend.panel_power_on = mfd->panel_power_on;
 
 	mfd->suspend.op_suspend = true;
-
+	
+/* OPPO 2013-10-28 gousj Add begin for black frame */
+#ifdef CONFIG_VENDOR_EDIT
+    /*
+    * For MDP with overlay, set framebuffer with black pixels
+    * to show black screen on primary screen.
+    */
+    memset32_io((void *)fbi->screen_base, 0x00, fbi->fix.smem_len);
+#endif
+/* OPPO 2013-10-28 gousj Add end */
+	
 	if (mfd->op_enable) {
 		ret =
 		     msm_fb_blank_sub(FB_BLANK_POWERDOWN, mfd->fbi,
@@ -890,10 +919,8 @@ static int msm_fb_ext_suspend(struct device *dev)
 
 		/* Turn off the HPD circuitry */
 		if (pdata->power_ctrl) {
-/* OPPO 2013-08-09 huanggd Modify begin for less print in system sleep/wakeup, may reduce system power*/			
-			//MSM_FB_INFO("%s: Turning off HPD circuitry\n",
-			//		__func__);
-/* OPPO 2013-08-09 huanggd Modify end*/
+			MSM_FB_INFO("%s: Turning off HPD circuitry\n",
+					__func__);
 			pdata->power_ctrl(FALSE);
 		}
 	}
@@ -922,10 +949,8 @@ static int msm_fb_ext_resume(struct device *dev)
 		/* Turn on the HPD circuitry */
 		if (pdata->power_ctrl) {
 			pdata->power_ctrl(TRUE);
-/* OPPO 2013-08-09 huanggd Modify begin for less print in system sleep/wakeup, may reduce system power*/			
-			//MSM_FB_INFO("%s: Turning on HPD circuitry\n",
-			//		__func__);
-/* OPPO 2013-08-09 huanggd Modify end*/			
+			MSM_FB_INFO("%s: Turning on HPD circuitry\n",
+					__func__);
 		}
 
 		ret = msm_fb_resume_sub(mfd);
@@ -1080,7 +1105,13 @@ void msm_fb_set_backlight(struct msm_fb_data_type *mfd, __u32 bkl_lvl)
 	__u32 temp = bkl_lvl;
 /* OPPO 2012-12-26 Van modify begin for boot mode */
 	//if (!mfd->panel_power_on || !bl_updated) {
+/* OPPO 2013-09-18 gousj Modify begin for recovery mode */
+#ifndef VENDOR_EDIT
 	if ((get_boot_mode()==MSM_BOOT_MODE__NORMAL)&&(!mfd->panel_power_on || !bl_updated)) {
+#else
+	if (((get_boot_mode()==MSM_BOOT_MODE__NORMAL) || (get_boot_mode()==MSM_BOOT_MODE__RECOVERY)) && (!mfd->panel_power_on || !bl_updated)) {
+#endif
+/* OPPO 2013-09-18 gousj Modify end */
 		unset_bl_level = bkl_lvl;
 		return;
 	} else {
@@ -1890,22 +1921,24 @@ static int msm_fb_register(struct msm_fb_data_type *mfd)
 			break;
 		case MSM_BOOT_MODE__RF:
 			if (!load_565rle_image(INIT_IMAGE_RF, bf_supported)){
-
+					/*
 					schedule_delayed_work(&startup_refresh_work,  HZ/20);
 					if (msm_fb_blank_sub(FB_BLANK_UNBLANK, mfd->fbi, mfd->op_enable)) {
 						printk(KERN_ERR "msm_fb_open: can't turn on display!\n");
 						return -1;
 					}
+					*/
 				}
 			break;
 		case MSM_BOOT_MODE__WLAN:
 			if (!load_565rle_image(INIT_IMAGE_WLAN, bf_supported)){
-
+					/*
 					schedule_delayed_work(&startup_refresh_work,  HZ/20);
 					if (msm_fb_blank_sub(FB_BLANK_UNBLANK, mfd->fbi, mfd->op_enable)) {
 						printk(KERN_ERR "msm_fb_open: can't turn on display!\n");
 						return -1;
 					}
+					*/
 				}
 			break;
 		case MSM_BOOT_MODE__CHARGE:
@@ -3506,11 +3539,8 @@ static int msmfb_overlay_set(struct fb_info *info, void __user *p)
 
 	ret = mdp4_overlay_set(info, &req);
 	if (ret) {
-/* OPPO 2013-08-06 huanggd Modify for reduce printk rate*/		
-		if (printk_ratelimit())				
-			printk(KERN_ERR "%s: ioctl failed, rc=%d\n",
-				__func__, ret);
-/* OPPO 2013-08-06 huanggd Modify end*/			
+		printk(KERN_ERR "%s: ioctl failed, rc=%d\n",
+			__func__, ret);
 		return ret;
 	}
 

@@ -1169,6 +1169,20 @@ static void print_ctx_regs(void __iomem *base, int ctx)
 	       GET_PRRR(base, ctx), GET_NMRR(base, ctx));
 }
 
+extern int get_boot_mode(void);
+/* OPPO 2013-09-18 gousj Add begin for recovery mode */
+#ifdef CONFIG_VEDOR_EDIT
+	enum{
+	MSM_BOOT_MODE__NORMAL,
+	MSM_BOOT_MODE__FASTBOOT,
+	MSM_BOOT_MODE__RECOVERY,
+	MSM_BOOT_MODE__FACTORY,
+	MSM_BOOT_MODE__RF,
+	MSM_BOOT_MODE__WLAN,
+	MSM_BOOT_MODE__CHARGE,
+	};
+#endif
+/* OPPO 2013-09-18 gousj Add end */
 irqreturn_t msm_iommu_fault_handler(int irq, void *dev_id)
 {
 	struct msm_iommu_ctx_drvdata *ctx_drvdata = dev_id;
@@ -1199,9 +1213,24 @@ irqreturn_t msm_iommu_fault_handler(int irq, void *dev_id)
 			pr_err("Bad domain in interrupt handler\n");
 			ret = -ENOSYS;
 		} else
+			{	
+/* OPPO 2013-09-18 gousj Modify begin for recovery mode */
+#ifndef CONFIG_VEDOR_EDIT
+				if(get_boot_mode() != 0)
+#else
+				if((get_boot_mode() != MSM_BOOT_MODE__NORMAL) && (get_boot_mode() != MSM_BOOT_MODE__RECOVERY))
+#endif
+/* OPPO 2013-09-18 gousj Modify end */
+					{
+						/* OPPO Neal add for iommu fault*/
+						pr_info("Neal disable IRQ\n\n");
+						disable_irq_nosync(irq);
+						/* OPPO Neal add end*/
+					}
 			ret = report_iommu_fault(ctx_drvdata->attached_domain,
 						&ctx_drvdata->pdev->dev,
 						GET_FAR(base, num), 0);
+			}
 
 		if (ret == -ENOSYS) {
 /* OPPO 2013-05-24 huanggd Modify for reduce printk rate*/			
